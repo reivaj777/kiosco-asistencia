@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Kiosco de Asistencia</title>
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1F2937">
+  
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  
+  <style>
+    .spinner { border-top-color: transparent; }
+    .toast { transition: opacity 0.3s ease-in-out; }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen text-gray-800">
+  
+  <!-- Loader Global -->
+  <div id="loader" class="fixed inset-0 bg-white/90 z-50 hidden flex-col justify-center items-center">
+    <div class="spinner border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12 animate-spin mb-4"></div>
+    <p class="font-semibold" id="loader-text">Procesando...</p>
+  </div>
+
+  <!-- VISTA 1: Menú Principal -->
+  <div id="view-menu" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+    <h1 class="text-2xl font-bold mb-8">Portal Corporativo</h1>
+    <button onclick="showView('view-kiosk')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 mb-4">
+      <i data-lucide="monitor-smartphone"></i> Abrir Kiosco
+    </button>
+    <button onclick="showView('view-admin')" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2">
+      <i data-lucide="shield-check"></i> Acceso Administradores
+    </button>
+  </div>
+
+  <!-- VISTA 2: Login Unificado -->
+  <div id="view-admin" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative">
+    <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800"><i data-lucide="arrow-left"></i></button>
+    <h2 class="text-xl font-bold mb-6 mt-4">Panel de Administración</h2>
+    <input type="password" id="admin-pin" placeholder="Ingresa PIN Administrativo" class="w-full text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-lg mb-6 focus:border-blue-500">
+    <button onclick="loginAdmin()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold">Autenticar</button>
+  </div>
+
+  <!-- VISTA 3: Kiosco Operativo -->
+  <div id="view-kiosk" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative">
+    <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800"><i data-lucide="arrow-left"></i></button>
+    <h2 class="text-xl font-bold mb-4 mt-4 flex justify-center items-center gap-2"><i data-lucide="fingerprint"></i> Control de Acceso</h2>
+    
+    <div id="offline-banner" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg mb-4 justify-between items-center text-sm font-bold shadow-inner">
+      <span><i data-lucide="wifi-off" class="w-4 h-4 inline mr-1"></i> <span id="offline-count">0</span> regs offline</span>
+      <button onclick="syncOffline()" class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Sincronizar</button>
+    </div>
+
+    <label for="camera-input" class="cursor-pointer flex flex-col items-center justify-center w-full h-40 bg-gray-200 rounded-lg mb-2 border-2 border-dashed border-gray-400 overflow-hidden relative">
+      <div id="camera-placeholder" class="text-gray-600 flex flex-col items-center z-10"><i data-lucide="camera" class="w-8 h-8"></i><span>Tocar para foto</span></div>
+      <input type="file" id="camera-input" accept="image/*" capture="user" class="hidden">
+      <canvas id="photo-canvas" class="absolute inset-0 w-full h-full object-cover hidden z-20"></canvas>
+    </label>
+
+    <button onclick="toggleQR()" class="text-sm text-blue-600 font-bold mb-4 flex items-center justify-center w-full gap-1"><i data-lucide="qr-code" class="w-4 h-4"></i> Usar Escáner QR Gafete</button>
+    <div id="qr-reader" class="w-full mb-4 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
+
+    <input type="password" id="pin-input" placeholder="Tu PIN" class="w-full text-center text-3xl tracking-widest font-bold py-3 px-4 border-2 rounded-lg mb-6" inputmode="numeric">
+    
+    <div class="grid grid-cols-2 gap-4">
+      <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">Entrada</button>
+      <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold">Salida</button>
+    </div>
+  </div>
+
+  <!-- VISTA 4: Dashboard RH -->
+  <div id="view-dashboard" class="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] hidden flex-col overflow-hidden">
+    <div class="bg-gray-800 text-white px-6 pt-4 flex flex-col">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="empresa-name" class="font-bold text-xl">Módulo RH</h2>
+        <button onclick="logoutAdmin()" class="text-sm bg-red-600 px-4 py-2 rounded font-bold"><i data-lucide="log-out" class="w-4 h-4 inline"></i> Salir</button>
+      </div>
+      <div class="flex gap-6 mt-2">
+        <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-2 font-bold border-b-4 border-blue-400 text-white">Pre-Nómina</button>
+        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-2 font-bold border-b-4 border-transparent text-gray-400 hover:text-white">Empleados</button>
+      </div>
+    </div>
+    
+    <!-- Tab 1: Pre-Nómina -->
+    <div id="tab-prenomina" class="flex-1 flex flex-col overflow-hidden">
+      <div class="p-6 bg-gray-50 border-b flex gap-4 flex-wrap items-end">
+        <div><label class="block text-sm font-semibold mb-1">Inicio</label><input type="date" id="date-start" class="border rounded p-2"></div>
+        <div><label class="block text-sm font-semibold mb-1">Fin</label><input type="date" id="date-end" class="border rounded p-2"></div>
+        <div class="flex gap-2">
+          <button onclick="loadReports()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700">Generar Pre-Nómina</button>
+          <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 hidden">Exportar CSV</button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-6">
+        <table class="w-full text-left border-collapse">
+          <thead><tr class="bg-gray-200 text-sm"><th class="p-3">Empleado</th><th class="p-3">Fecha</th><th class="p-3 text-center">Horarios</th><th class="p-3 text-center">Dobles</th><th class="p-3 text-center">Triples</th><th class="p-3">Alertas</th></tr></thead>
+          <tbody id="table-body"><tr><td colspan="6" class="p-4 text-center text-gray-500">Selecciona fechas y genera el reporte.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Empleados -->
+    <div id="tab-empleados" class="flex-1 flex flex-col overflow-hidden hidden">
+      <div class="p-6 bg-gray-50 border-b flex justify-between items-center">
+        <h3 class="font-bold text-lg text-gray-700">Catálogo de Personal</h3>
+        <button onclick="document.getElementById('modal-empleado').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">+ Nuevo Empleado</button>
+      </div>
+      <div class="flex-1 overflow-auto p-6">
+        <table class="w-full text-left border-collapse">
+          <thead><tr class="bg-gray-200 text-sm"><th class="p-3">Nombre</th><th class="p-3">PIN (Kiosco)</th><th class="p-3">Turno</th><th class="p-3">Estatus</th><th class="p-3">Acción</th></tr></thead>
+          <tbody id="table-empleados"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA 5: Super Admin -->
+  <div id="view-superadmin" class="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] hidden flex-col overflow-hidden border-t-8 border-purple-600">
+    <div class="bg-gray-900 text-white px-6 py-4 flex justify-between items-center">
+      <h2 class="font-bold text-xl"><i data-lucide="crown" class="inline w-6 h-6 mr-2 text-yellow-400"></i>Panel Maestro</h2>
+      <button onclick="logoutAdmin()" class="text-sm bg-red-600 px-4 py-2 rounded font-bold">Salir</button>
+    </div>
+    <div class="p-6 bg-gray-50 border-b flex justify-between items-center">
+      <h3 class="font-bold text-lg text-gray-700">Empresas Clientes</h3>
+      <button onclick="document.getElementById('modal-empresa').classList.remove('hidden')" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-700">+ Alta de Empresa</button>
+    </div>
+    <div class="flex-1 overflow-auto p-6">
+      <table class="w-full text-left border-collapse">
+        <thead><tr class="bg-gray-200 text-sm"><th class="p-3">ID Local</th><th class="p-3">Razón Social</th><th class="p-3">Admin PIN</th><th class="p-3">Módulos</th></tr></thead>
+        <tbody id="table-empresas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODALES -->
+  <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center">
+    <div class="bg-white p-6 rounded-xl w-full max-w-sm">
+      <h3 class="font-bold text-lg mb-4">Alta de Empleado</h3>
+      <input type="text" id="new-emp-nombre" placeholder="Nombre completo" class="w-full border p-2 mb-3 rounded">
+      <input type="number" id="new-emp-pin" placeholder="Crear PIN" class="w-full border p-2 mb-3 rounded">
+      <input type="text" id="new-emp-turno" placeholder="ID del Turno" class="w-full border p-2 mb-4 rounded">
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modal-empleado').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold">Cancelar</button>
+        <button onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-empresa" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center">
+    <div class="bg-white p-6 rounded-xl w-full max-w-sm">
+      <h3 class="font-bold text-lg mb-4 text-purple-700">Crear Empresa Cliente</h3>
+      <input type="text" id="new-cia-nombre" placeholder="Nombre" class="w-full border p-2 mb-2 rounded">
+      <div class="grid grid-cols-2 gap-2 mb-2"><input type="text" id="new-cia-lat" placeholder="Latitud" class="border p-2 rounded"><input type="text" id="new-cia-lng" placeholder="Longitud" class="border p-2 rounded"></div>
+      <input type="number" id="new-cia-radio" placeholder="Tolerancia Mts" class="w-full border p-2 mb-2 rounded">
+      <input type="number" id="new-cia-pin" placeholder="PIN RH" class="w-full border p-2 mb-2 rounded">
+      <input type="text" id="new-cia-modulos" placeholder="Módulos" value="BASE,RH" class="w-full border p-2 mb-4 rounded">
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold">Cancelar</button>
+        <button onclick="saveEmpresa()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold">Dar de Alta</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+  <script src="app.js"></script>
+</body>
+</html>
