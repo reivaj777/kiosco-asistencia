@@ -173,10 +173,15 @@ async function loadReports() {
       currentReportData = res.data; 
       btn.classList.remove('hidden');
       tb.innerHTML = res.data.map(row => `
-        <tr class="border-b">
+<tr class="border-b">
           <td class="p-3 font-bold">${row.empleado}</td>
           <td class="p-3 text-sm">${row.fecha}</td>
-          <td class="p-3 text-center"><span class="${row.retardo?'text-red-600':'text-green-600'} font-bold">${row.entrada}</span><br><span class="font-bold">${row.salida}</span></td>
+          <td class="p-3 text-center">
+            ${row.foto && row.foto !== 'SIN_FOTO' ? `<a href="${row.foto}" target="_blank" class="text-blue-600 hover:text-blue-800"><i data-lucide="image" class="w-5 h-5 mx-auto"></i></a>` : '-'}
+          </td>
+          <td class="p-3 text-center">
+             ${row.entrada === '--' ? '<span class="bg-red-500 text-white px-2 py-1 rounded font-bold text-xs">FALTA</span>' : `<span class="${row.retardo?'text-red-600':'text-green-600'} font-bold">${row.entrada}</span><br><span class="font-bold">${row.salida}</span>`}
+          </td>
           <td class="p-3 text-center">${row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold">${row.dobles} h</span>` : '-'}</td>
           <td class="p-3 text-center">${row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold">${row.triples} h</span>` : '-'}</td>
           <td class="p-3">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 rounded font-bold text-xs">GPS Fuera</span>' : ''}</td>
