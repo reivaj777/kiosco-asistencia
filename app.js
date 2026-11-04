@@ -138,11 +138,18 @@ async function loadReports() {
       tb.innerHTML = res.data.map(row => {
         let recuadroFoto = '';
         if (row.foto && row.foto !== 'SIN_FOTO') {
+          // Extraemos el ID del archivo
           const fileIdMatch = row.foto.match(/[-\w]{25,}/);
-          const thumbUrl = fileIdMatch ? `https://drive.google.com/uc?id=${fileIdMatch[0]}` : row.foto;
+          
+          // SOLUCIÓN: Usamos la API de Thumbnails de Google (sz=w150 hace la imagen ligera y rápida)
+          const thumbUrl = fileIdMatch ? `https://drive.google.com/thumbnail?id=${fileIdMatch[0]}&sz=w150` : row.foto;
+          
           recuadroFoto = `
             <a href="${row.foto}" target="_blank" class="inline-block">
-              <img src="${thumbUrl}" class="w-10 h-10 object-cover rounded-full mx-auto border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm" title="Clic para ampliar">
+              <img src="${thumbUrl}" 
+                   onerror="this.onerror=null; this.outerHTML='<div class=\\'w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mx-auto text-xs font-bold text-gray-600\\'>Foto</div>';"
+                   class="w-10 h-10 object-cover rounded-full mx-auto border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm" 
+                   title="Clic para ampliar">
             </a>`;
         } else {
           recuadroFoto = `<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mx-auto text-gray-400" title="Sin Evidencia"><i data-lucide="user-x" class="w-5 h-5"></i></div>`;
