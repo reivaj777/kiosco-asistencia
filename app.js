@@ -172,19 +172,17 @@ async function loadReports() {
         let recuadroFoto = '';
         if (row.foto && row.foto !== 'SIN_FOTO') {
           const fileIdMatch = row.foto.match(/[-\w]{25,}/);
-          // CDN nativo de Google para saltar bloqueos de Drive
-          const cdnUrl = fileIdMatch ? `https://lh3.googleusercontent.com/d/${fileIdMatch[0]}=s150` : row.foto;
-          const fallbackUrl = fileIdMatch ? `https://drive.google.com/uc?export=view&id=${fileIdMatch[0]}` : row.foto;
+          // Usamos el endpoint estándar de Drive para incrustar
+          const thumbUrl = fileIdMatch ? `https://drive.google.com/uc?id=${fileIdMatch[0]}` : row.foto;
           
           recuadroFoto = `
-            <a href="${row.foto}" target="_blank" class="inline-block">
-              <img src="${cdnUrl}" 
-                   onerror="this.onerror=null; this.src='${fallbackUrl}'; this.onerror=function(){this.outerHTML='<div class=\\'w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mx-auto text-xs font-bold text-gray-600\\'>Foto</div>'};"
-                   class="w-10 h-10 object-cover rounded-full mx-auto border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm" 
-                   title="Clic para ampliar">
+            <a href="${row.foto}" target="_blank" class="inline-flex relative items-center justify-center w-10 h-10 bg-blue-100 rounded-full border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm overflow-hidden text-blue-600" title="Ver Evidencia">
+              <!-- Si Chrome bloquea la imagen, el onerror la oculta y deja ver el fondo azul con el ícono -->
+              <i data-lucide="image" class="w-5 h-5 absolute z-0"></i>
+              <img src="${thumbUrl}" class="w-full h-full object-cover z-10 relative" onerror="this.style.display='none';">
             </a>`;
         } else {
-          recuadroFoto = `<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mx-auto text-gray-400" title="Sin Evidencia"><i data-lucide="user-x" class="w-5 h-5"></i></div>`;
+          recuadroFoto = `<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mx-auto text-gray-400" title="Falta - Sin Evidencia"><i data-lucide="user-x" class="w-5 h-5"></i></div>`;
         }
 
         return `
