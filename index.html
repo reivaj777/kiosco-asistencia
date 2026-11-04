@@ -57,11 +57,15 @@
       <button onclick="syncOffline()" class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Sincronizar</button>
     </div>
 
-    <label for="camera-input" class="cursor-pointer flex flex-col items-center justify-center w-full h-40 bg-gray-200 rounded-lg mb-2 border-2 border-dashed border-gray-400 overflow-hidden relative">
-      <div id="camera-placeholder" class="text-gray-600 flex flex-col items-center z-10"><i data-lucide="camera" class="w-8 h-8"></i><span>Tocar para foto</span></div>
-      <input type="file" id="camera-input" accept="image/*" capture="user" class="hidden">
-      <canvas id="photo-canvas" class="absolute inset-0 w-full h-full object-cover hidden z-20"></canvas>
-    </label>
+<!-- CÁMARA ALWAYS-ON EN VIVO -->
+    <div class="relative w-full h-64 bg-black rounded-lg mb-4 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
+      <!-- playsinline es CRÍTICO para que iOS no abra el video en pantalla completa -->
+      <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
+      <canvas id="capture-canvas" class="hidden"></canvas>
+      
+      <!-- Efecto de flash visual al checar -->
+      <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-10"></div>
+    </div>
 
     <button onclick="toggleQR()" class="text-sm text-blue-600 font-bold mb-4 flex items-center justify-center w-full gap-1"><i data-lucide="qr-code" class="w-4 h-4"></i> Usar Escáner QR Gafete</button>
     <div id="qr-reader" class="w-full mb-4 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
