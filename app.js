@@ -204,11 +204,22 @@ async function syncOffline() {
   if(!navigator.onLine) return showToast('Sin conexión WiFi/Datos', 'error');
   let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
   if(offlineData.length === 0) return;
+  
   toggleLoader(true, `Vaciando ${offlineData.length} registros...`);
   try {
     const res = await runServer('apiSyncOffline', offlineData);
-    if(res.status === 'success') { localStorage.removeItem('offline_registros'); showToast(res.message); updateOfflineUI(); }
-  } catch(e) { showToast('Fallo Servidor', 'error'); } toggleLoader(false);
+    if(res.status === 'success') { 
+      localStorage.removeItem('offline_registros'); 
+      showToast(res.message); 
+      updateOfflineUI(); 
+    } else {
+      // ESTO FALTABA: Mostrar el error si Google lo rechaza
+      showToast(res.message, 'error');
+    }
+  } catch(e) { 
+    showToast('Fallo Servidor de Google', 'error'); 
+  } 
+  toggleLoader(false);
 }
 
 function resetKiosk() {
