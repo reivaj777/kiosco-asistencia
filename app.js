@@ -76,11 +76,14 @@ function showToast(m, t='success') {
 async function startCamera() {
   const video = document.getElementById('live-video');
   try {
+    // Quitamos la exigencia de tamaño exacto, dejamos que Android decida su mejor formato
     videoStream = await navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, 
+      video: { facingMode: "user" }, 
       audio: false 
     });
     video.srcObject = videoStream;
+    // Forzamos el encendido en cuanto el video cargue (Vital para Android/iOS)
+    video.onloadedmetadata = () => { video.play(); };
   } catch (err) {
     showToast("Permiso de cámara denegado", "error");
   }
