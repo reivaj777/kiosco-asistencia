@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Kiosco de Asistencia</title>
+  <title>Kiosco de Asistencia SaaS</title>
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="mobile-web-app-capable" content="yes">
@@ -22,13 +22,13 @@
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen text-gray-800">
   
-  <!-- Loader Global -->
+  <!-- Loader -->
   <div id="loader" class="fixed inset-0 bg-white/90 z-50 hidden flex-col justify-center items-center">
     <div class="spinner border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12 animate-spin mb-4"></div>
     <p class="font-semibold" id="loader-text">Procesando...</p>
   </div>
 
-  <!-- VISTA 1: Menú Principal -->
+  <!-- VISTA 1: Menú -->
   <div id="view-menu" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
     <h1 class="text-2xl font-bold mb-8">Portal Corporativo</h1>
     <button onclick="showView('view-kiosk')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 mb-4">
@@ -39,15 +39,15 @@
     </button>
   </div>
 
-  <!-- VISTA 2: Login Unificado -->
+  <!-- VISTA 2: Login Admin -->
   <div id="view-admin" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative">
     <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800"><i data-lucide="arrow-left"></i></button>
     <h2 class="text-xl font-bold mb-6 mt-4">Panel de Administración</h2>
-    <input type="password" id="admin-pin" placeholder="Ingresa PIN Administrativo" class="w-full text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-lg mb-6 focus:border-blue-500">
+    <input type="password" id="admin-pin" placeholder="PIN Administrativo" class="w-full text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-lg mb-6 focus:border-blue-500">
     <button onclick="loginAdmin()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold">Autenticar</button>
   </div>
 
-  <!-- VISTA 3: Kiosco Operativo -->
+  <!-- VISTA 3: Kiosco -->
   <div id="view-kiosk" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative">
     <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800"><i data-lucide="arrow-left"></i></button>
     <h2 class="text-xl font-bold mb-4 mt-4 flex justify-center items-center gap-2"><i data-lucide="fingerprint"></i> Control de Acceso</h2>
@@ -57,17 +57,14 @@
       <button onclick="syncOffline()" class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Sincronizar</button>
     </div>
 
-<!-- CÁMARA ALWAYS-ON EN VIVO -->
+    <!-- CÁMARA ALWAYS-ON -->
     <div class="relative w-full h-64 bg-black rounded-lg mb-4 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
-      <!-- playsinline es CRÍTICO para que iOS no abra el video en pantalla completa -->
       <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
       <canvas id="capture-canvas" class="hidden"></canvas>
-      
-      <!-- Efecto de flash visual al checar -->
       <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-10"></div>
     </div>
 
-    <button onclick="toggleQR()" class="text-sm text-blue-600 font-bold mb-4 flex items-center justify-center w-full gap-1"><i data-lucide="qr-code" class="w-4 h-4"></i> Usar Escáner QR Gafete</button>
+    <button onclick="toggleQR()" class="text-sm text-blue-600 font-bold mb-4 flex items-center justify-center w-full gap-1"><i data-lucide="qr-code" class="w-4 h-4"></i> Usar Escáner QR</button>
     <div id="qr-reader" class="w-full mb-4 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
 
     <input type="password" id="pin-input" placeholder="Tu PIN" class="w-full text-center text-3xl tracking-widest font-bold py-3 px-4 border-2 rounded-lg mb-6" inputmode="numeric">
@@ -91,13 +88,13 @@
       </div>
     </div>
     
-    <!-- Tab 1: Pre-Nómina -->
+    <!-- Tab Pre-Nómina -->
     <div id="tab-prenomina" class="flex-1 flex flex-col overflow-hidden">
       <div class="p-6 bg-gray-50 border-b flex gap-4 flex-wrap items-end">
         <div><label class="block text-sm font-semibold mb-1">Inicio</label><input type="date" id="date-start" class="border rounded p-2"></div>
         <div><label class="block text-sm font-semibold mb-1">Fin</label><input type="date" id="date-end" class="border rounded p-2"></div>
         <div class="flex gap-2">
-          <button onclick="loadReports()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700">Generar Pre-Nómina</button>
+          <button onclick="loadReports()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700">Generar Reporte</button>
           <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 hidden">Exportar CSV</button>
         </div>
       </div>
@@ -118,7 +115,10 @@
             <tr><td colspan="7" class="p-4 text-center text-gray-500">Selecciona fechas y genera el reporte.</td></tr>
           </tbody>
         </table>
-    <!-- Tab 2: Empleados -->
+      </div>
+    </div>
+
+    <!-- Tab Empleados -->
     <div id="tab-empleados" class="flex-1 flex flex-col overflow-hidden hidden">
       <div class="p-6 bg-gray-50 border-b flex justify-between items-center">
         <h3 class="font-bold text-lg text-gray-700">Catálogo de Personal</h3>
@@ -126,7 +126,7 @@
       </div>
       <div class="flex-1 overflow-auto p-6">
         <table class="w-full text-left border-collapse">
-          <thead><tr class="bg-gray-200 text-sm"><th class="p-3">Nombre</th><th class="p-3">PIN (Kiosco)</th><th class="p-3">Turno</th><th class="p-3">Estatus</th><th class="p-3">Acción</th></tr></thead>
+          <thead><tr class="bg-gray-200 text-sm"><th class="p-3">Nombre</th><th class="p-3">PIN</th><th class="p-3">Turno</th><th class="p-3">Estatus</th><th class="p-3">Acción</th></tr></thead>
           <tbody id="table-empleados"></tbody>
         </table>
       </div>
@@ -151,7 +151,7 @@
     </div>
   </div>
 
-  <!-- MODALES -->
+  <!-- Modales -->
   <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center">
     <div class="bg-white p-6 rounded-xl w-full max-w-sm">
       <h3 class="font-bold text-lg mb-4">Alta de Empleado</h3>
