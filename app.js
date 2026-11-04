@@ -167,26 +167,46 @@ async function loadReports() {
     
     if(res.data.length === 0) {
       currentReportData = []; 
-      tb.innerHTML = '<tr><td colspan="6" class="p-4 text-center">Sin registros en este periodo.</td></tr>'; 
+      tb.innerHTML = '<tr><td colspan="7" class="p-4 text-center">Sin registros en este periodo.</td></tr>'; 
       btn.classList.add('hidden');
     } else {
       currentReportData = res.data; 
       btn.classList.remove('hidden');
-      tb.innerHTML = res.data.map(row => `
-<tr class="border-b">
+      tb.innerHTML = res.data.map(row => {
+        
+        // Magia para extraer el ID de Drive y forzar la imagen incrustada
+        let recuadroFoto = '';
+        if (row.foto && row.foto !== 'SIN_FOTO') {
+          const fileIdMatch = row.foto.match(/[-\w]{25,}/); // Busca el código alfanumérico del Drive
+          const thumbUrl = fileIdMatch ? `https://drive.google.com/uc?id=${fileIdMatch[0]}` : row.foto;
+          recuadroFoto = `
+            <a href="${row.foto}" target="_blank" class="inline-block">
+              <img src="${thumbUrl}" class="w-10 h-10 object-cover rounded-full mx-auto border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm" title="Clic para ampliar">
+            </a>`;
+        } else {
+          recuadroFoto = `<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mx-auto text-gray-400" title="Sin Evidencia"><i data-lucide="user-x" class="w-5 h-5"></i></div>`;
+        }
+
+        return `
+        <tr class="border-b hover:bg-gray-50 transition-colors">
           <td class="p-3 font-bold">${row.empleado}</td>
           <td class="p-3 text-sm">${row.fecha}</td>
+          <td class="p-3 text-center">${recuadroFoto}</td>
           <td class="p-3 text-center">
-            ${row.foto && row.foto !== 'SIN_FOTO' ? `<a href="${row.foto}" target="_blank" class="text-blue-600 hover:text-blue-800"><i data-lucide="image" class="w-5 h-5 mx-auto"></i></a>` : '-'}
-          </td>
-          <td class="p-3 text-center">
-             ${row.entrada === '--' ? '<span class="bg-red-500 text-white px-2 py-1 rounded font-bold text-xs">FALTA</span>' : `<span class="${row.retardo?'text-red-600':'text-green-600'} font-bold">${row.entrada}</span><br><span class="font-bold">${row.salida}</span>`}
+            ${row.entrada === '--' ? 
+              '<span class="bg-red-500 text-white px-2 py-1 rounded font-bold text-xs">FALTA</span>' : 
+              `<span class="${row.retardo ? 'text-red-600' : 'text-green-600'} font-bold">${row.entrada}</span><br><span class="font-bold text-gray-600">${row.salida}</span>`
+            }
           </td>
           <td class="p-3 text-center">${row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold">${row.dobles} h</span>` : '-'}</td>
           <td class="p-3 text-center">${row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold">${row.triples} h</span>` : '-'}</td>
           <td class="p-3">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 rounded font-bold text-xs">GPS Fuera</span>' : ''}</td>
         </tr>
-      `).join('');
+        `;
+      }).join('');
+      
+      // Forzar renderizado de los íconos de Lucide en el nuevo HTML inyectado
+      setTimeout(() => lucide.createIcons(), 100);
     }
   } catch(er) { showToast('Error al generar reporte', 'error'); } 
   toggleLoader(false);
