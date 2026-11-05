@@ -24,6 +24,7 @@ let faceDetectionInterval = null;
 let enrolDescriptor = null;
 let enrolInterval = null;
 let currentEnrolId = null;
+let enrolModo = "CAMARA"; // Puede ser CAMARA o ARCHIVO
 
 // ==========================================
 // ARRANQUE Y DESCARGA DE REDES NEURONALES
@@ -33,7 +34,7 @@ window.onload = async () => {
   runServer('apiInitDatabase', {}).catch(e => console.log("Modo offline activado desde inicio")); 
   
   try {
-    // Descarga los modelos desde el CDN oficial
+    // Descarga los modelos desde el CDN oficial (Se guardan en caché gracias al sw.js)
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights'),
       faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights'),
@@ -74,24 +75,17 @@ function showView(viewId) {
   ['view-menu', 'view-admin', 'view-kiosk', 'view-dashboard', 'view-superadmin'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
-  
   document.getElementById(viewId).classList.remove('hidden');
   
   if(viewId === 'view-kiosk') { 
-    initGPS(); 
-    updateOfflineUI(); 
-    initKioskAI(); // Descarga los rostros de la empresa
-    startCamera(); 
-  } else {
-    stopCamera(); 
-  }
+    initGPS(); updateOfflineUI(); initKioskAI(); startCamera(); 
+  } else { stopCamera(); }
 }
 
 function toggleLoader(s, t='Procesando...') { 
   const l = document.getElementById('loader'); 
   document.getElementById('loader-text').innerText = t; 
-  if(s) { l.classList.remove('hidden'); l.classList.add('flex'); } 
-  else { l.classList.add('hidden'); l.classList.remove('flex'); } 
+  if(s) { l.classList.remove('hidden'); l.classList.add('flex'); } else { l.classList.add('hidden'); l.classList.remove('flex'); } 
 }
 
 function showToast(m, t='success') { 
@@ -99,13 +93,12 @@ function showToast(m, t='success') {
   const d = document.createElement('div'); 
   d.className = `toast ${t==='success'?'bg-green-600':'bg-red-600'} text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 mb-2 z-50 shadow-lg`; 
   d.innerHTML = `<i data-lucide="${t==='success'?'check-circle':'alert-circle'}"></i> ${m}`; 
-  c.appendChild(d); 
-  lucide.createIcons(); 
+  c.appendChild(d); lucide.createIcons(); 
   setTimeout(() => { d.style.opacity = '0'; setTimeout(() => d.remove(), 300); }, 3500); 
 }
 
 // ==========================================
-// CÁMARA KIOSCO Y DETECCIÓN FACIAL EN VIVO
+// CÁMARA KIOSCO Y DETECCIÓN FACIAL
 // ==========================================
 async function startCamera() {
   const video = document.getElementById('live-video');
@@ -115,7 +108,6 @@ async function startCamera() {
     video.srcObject = videoStream;
     video.onloadedmetadata = () => { video.play(); };
     
-    // Bucle de Inteligencia Artificial
     video.onplay = () => {
       faceDetectionInterval = setInterval(async () => {
         if(!faceModelsLoaded || video.videoWidth === 0) return;
@@ -127,13 +119,12 @@ async function startCamera() {
         const resizedDetections = faceapi.resizeResults(detections, displaySize);
         
         canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-        faceapi.draw.drawDetections(canvas, resizedDetections); // Dibuja el recuadro verde
+        faceapi.draw.drawDetections(canvas, resizedDetections);
         
         if(faceMatcher && resizedDetections.length > 0) {
            const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
            results.forEach((result, i) => {
               if(result.label !== 'unknown') {
-                 // Autocompletado mágico: Si reconoce a la persona, escribe su PIN
                  const pinInput = document.getElementById('pin-input');
                  if(pinInput.value !== result.label) {
                      pinInput.value = result.label;
@@ -144,36 +135,23 @@ async function startCamera() {
               }
            });
         }
-      }, 400); // Escanea cada 400 milisegundos
+      }, 400);
     };
-  } catch (err) {
-    showToast("Permiso de cámara denegado", "error");
-  }
+  } catch (err) { showToast("Permiso de cámara denegado", "error"); }
 }
 
 function stopCamera() {
   if(faceDetectionInterval) clearInterval(faceDetectionInterval);
-  if (videoStream) {
-    videoStream.getTracks().forEach(track => track.stop());
-    videoStream = null;
-  }
+  if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
 }
 
-// Descarga los rostros de la empresa al Kiosco
+// Inicializar Inteligencia Artificial (Con protección Offline)
 async function initKioskAI() {
-  if(!kioskEmpresa) {
-     showToast('Inicia sesión como Administrador de RH primero para vincular la sucursal.', 'error');
-     return;
-  }
+  if(!kioskEmpresa) { showToast('Inicia sesión como Administrador de RH primero.', 'error'); return; }
   
   const statusEl = document.getElementById('kiosk-ai-status');
-  
-  // Si no hay internet, saltamos la descarga pero permitimos que el Kiosco funcione con PIN
   if(!navigator.onLine) {
-    if(statusEl) {
-      statusEl.innerText = "Modo Offline Activo (Usa tu PIN)";
-      statusEl.classList.replace('text-gray-500', 'text-yellow-600');
-    }
+    if(statusEl) { statusEl.innerText = "Modo Offline: IA pausada (Usa tu PIN)"; statusEl.classList.replace('text-gray-500', 'text-yellow-600'); }
     return;
   }
 
@@ -188,16 +166,10 @@ async function initKioskAI() {
      }
      if(labeledFaceDescriptors.length > 0) {
         faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55);
-        if(statusEl) {
-          statusEl.innerText = "Reconocimiento Facial Activo y Listo";
-          statusEl.classList.replace('text-gray-500', 'text-green-600');
-        }
+        if(statusEl) { statusEl.innerText = "Reconocimiento Facial Activo y Listo"; statusEl.className = 'text-xs text-green-600 font-semibold mb-4'; }
      }
   } catch(e) {
-    if(statusEl) {
-      statusEl.innerText = "Reconocimiento Facial no disponible (Usa tu PIN)";
-      statusEl.classList.replace('text-gray-500', 'text-red-500');
-    }
+    if(statusEl) { statusEl.innerText = "Error cargando red (Usa tu PIN)"; statusEl.className = 'text-xs text-red-500 font-semibold mb-4'; }
   }
 }
 
@@ -217,7 +189,7 @@ async function loginAdmin() {
         loadEmpresas(); showView('view-superadmin');
       } else {
         currentEmpresa = res.data; 
-        localStorage.setItem('kiosco_empresa', JSON.stringify(currentEmpresa)); // VINCULA EL KIOSCO
+        localStorage.setItem('kiosco_empresa', JSON.stringify(currentEmpresa)); 
         kioskEmpresa = currentEmpresa; 
         
         document.getElementById('empresa-name').innerText = `RH: ${currentEmpresa.nombre}`;
@@ -239,13 +211,54 @@ function switchRHTab(tabId) {
   
   document.getElementById('tab-' + tabId).classList.remove('hidden');
   document.getElementById('tab-btn-' + tabId).classList.replace('border-transparent', 'border-blue-400'); document.getElementById('tab-btn-' + tabId).classList.replace('text-gray-400', 'text-white');
-  
   if(tabId === 'empleados') loadEmpleados();
 }
 
 // ==========================================
-// DASHBOARD RH: PRE-NÓMINA Y FOTOS
+// DASHBOARD RH: PRE-NÓMINA, FILTROS Y FOTOS
 // ==========================================
+function renderReportTable(data) {
+  const tb = document.getElementById('table-body');
+  const btn = document.getElementById('btn-export');
+  
+  if(data.length === 0) {
+    tb.innerHTML = '<tr><td colspan="7" class="p-4 text-center">Sin registros o sin resultados de búsqueda.</td></tr>'; 
+    if(!document.getElementById('search-report').value) btn.classList.add('hidden');
+  } else {
+    btn.classList.remove('hidden');
+    tb.innerHTML = data.map(row => {
+      let recuadroFoto = '';
+      if (row.foto && row.foto !== 'SIN_FOTO') {
+        const fileIdMatch = row.foto.match(/[-\w]{25,}/);
+        const thumbUrl = fileIdMatch ? `https://drive.google.com/thumbnail?id=${fileIdMatch[0]}&sz=w1000` : row.foto;
+        recuadroFoto = `<a href="${row.foto}" target="_blank" class="inline-block"><img src="${thumbUrl}" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mx-auto text-xs font-bold text-gray-600\\'>Foto</div>';" class="w-10 h-10 object-cover rounded-full mx-auto border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm" title="Clic para ampliar"></a>`;
+      } else {
+        recuadroFoto = `<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mx-auto text-gray-400"><i data-lucide="user-x" class="w-5 h-5"></i></div>`;
+      }
+      return `
+      <tr class="border-b hover:bg-gray-50 transition-colors">
+        <td class="p-3 font-bold">${row.empleado} <br><span class="text-xs text-gray-500 font-normal">ID: ${row.empId}</span></td>
+        <td class="p-3 text-sm">${row.fecha}</td><td class="p-3 text-center">${recuadroFoto}</td>
+        <td class="p-3 text-center">${row.entrada === '--' ? '<span class="bg-red-500 text-white px-2 py-1 rounded font-bold text-xs">FALTA</span>' : `<span class="${row.retardo ? 'text-red-600' : 'text-green-600'} font-bold">${row.entrada}</span><br><span class="font-bold text-gray-600">${row.salida}</span>`}</td>
+        <td class="p-3 text-center">${row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold">${row.dobles} h</span>` : '-'}</td>
+        <td class="p-3 text-center">${row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold">${row.triples} h</span>` : '-'}</td>
+        <td class="p-3">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 rounded font-bold text-xs">GPS Fuera</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+    setTimeout(() => lucide.createIcons(), 50);
+  }
+}
+
+// Lógica para el Buscador de Pre-Nómina
+function filterReport() {
+  const query = document.getElementById('search-report').value.toLowerCase();
+  const filtered = currentReportData.filter(r => 
+    r.empleado.toLowerCase().includes(query) || 
+    String(r.empId).toLowerCase().includes(query)
+  );
+  renderReportTable(filtered);
+}
+
 async function loadReports() {
   if(!currentEmpresa) return;
   const s = document.getElementById('date-start').value, e = document.getElementById('date-end').value;
@@ -254,38 +267,10 @@ async function loadReports() {
   toggleLoader(true, 'Aplicando Ley LFT...');
   try {
     const res = await runServer('apiGetReports', { empresaId: currentEmpresa.empresaId, fechaInicio: s, fechaFin: e });
-    const tb = document.getElementById('table-body');
-    const btn = document.getElementById('btn-export');
-    
-    if(res.data.length === 0) {
-      currentReportData = []; 
-      tb.innerHTML = '<tr><td colspan="7" class="p-4 text-center">Sin registros en este periodo.</td></tr>'; 
-      btn.classList.add('hidden');
-    } else {
-      currentReportData = res.data; btn.classList.remove('hidden');
-      tb.innerHTML = res.data.map(row => {
-        let recuadroFoto = '';
-        if (row.foto && row.foto !== 'SIN_FOTO') {
-          const fileIdMatch = row.foto.match(/[-\w]{25,}/);
-          const thumbUrl = fileIdMatch ? `https://drive.google.com/thumbnail?id=${fileIdMatch[0]}&sz=w1000` : row.foto;
-          recuadroFoto = `
-            <a href="${row.foto}" target="_blank" class="inline-block">
-              <img src="${thumbUrl}" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mx-auto text-xs font-bold text-gray-600\\'>Foto</div>';" class="w-10 h-10 object-cover rounded-full mx-auto border-2 border-blue-400 hover:scale-110 transition-transform shadow-sm" title="Clic para ampliar">
-            </a>`;
-        } else {
-          recuadroFoto = `<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mx-auto text-gray-400"><i data-lucide="user-x" class="w-5 h-5"></i></div>`;
-        }
-        return `
-        <tr class="border-b hover:bg-gray-50 transition-colors">
-          <td class="p-3 font-bold">${row.empleado}</td><td class="p-3 text-sm">${row.fecha}</td><td class="p-3 text-center">${recuadroFoto}</td>
-          <td class="p-3 text-center">${row.entrada === '--' ? '<span class="bg-red-500 text-white px-2 py-1 rounded font-bold text-xs">FALTA</span>' : `<span class="${row.retardo ? 'text-red-600' : 'text-green-600'} font-bold">${row.entrada}</span><br><span class="font-bold text-gray-600">${row.salida}</span>`}</td>
-          <td class="p-3 text-center">${row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold">${row.dobles} h</span>` : '-'}</td>
-          <td class="p-3 text-center">${row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold">${row.triples} h</span>` : '-'}</td>
-          <td class="p-3">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 rounded font-bold text-xs">GPS Fuera</span>' : ''}</td>
-        </tr>`;
-      }).join('');
-      setTimeout(() => lucide.createIcons(), 50);
-    }
+    currentReportData = res.data || [];
+    const searchInput = document.getElementById('search-report');
+    if(searchInput) searchInput.value = ''; // Limpiamos el buscador al hacer nueva consulta
+    renderReportTable(currentReportData);
   } catch(er) { showToast('Error al generar reporte', 'error'); } 
   toggleLoader(false);
 }
@@ -293,7 +278,11 @@ async function loadReports() {
 function exportToCSV() {
   if (currentReportData.length === 0) return;
   const headers = ["Empleado", "Fecha", "Entrada", "Salida", "Horas Dobles", "Horas Triples", "Alerta GPS"];
-  const rows = currentReportData.map(row => [`"${row.empleado}"`, row.fecha, row.entrada, row.salida, row.dobles, row.triples, row.estatusGeo].join(","));
+  // Si están buscando, exportamos solo lo filtrado
+  const query = document.getElementById('search-report') ? document.getElementById('search-report').value.toLowerCase() : '';
+  const toExport = query ? currentReportData.filter(r => r.empleado.toLowerCase().includes(query) || String(r.empId).toLowerCase().includes(query)) : currentReportData;
+  
+  const rows = toExport.map(row => [`"${row.empleado}"`, row.fecha, row.entrada, row.salida, row.dobles, row.triples, row.estatusGeo].join(","));
   const csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
@@ -311,12 +300,8 @@ async function loadEmpleados() {
     const res = await runServer('apiGetEmpleados', currentEmpresa.empresaId);
     document.getElementById('table-empleados').innerHTML = res.data.length ? res.data.map(e => `
       <tr class="border-b">
-        <td class="p-3 font-bold">${e.nombre}</td>
-        <td class="p-3 text-blue-600 font-bold">${e.pin}</td>
-        <td class="p-3">${e.turno}</td>
-        <td class="p-3 text-center">
-            ${e.mapaFacial ? '<span class="text-green-600 font-bold text-xs"><i data-lucide="check-circle" class="w-4 h-4 inline"></i> OK</span>' : `<button onclick="openEnrolarModal('${e.id}', '${e.nombre}')" class="bg-purple-100 text-purple-700 px-3 py-1 rounded text-xs font-bold hover:bg-purple-200">Enrolar</button>`}
-        </td>
+        <td class="p-3 font-bold">${e.nombre}</td><td class="p-3 text-blue-600 font-bold">${e.pin}</td><td class="p-3">${e.turno}</td>
+        <td class="p-3 text-center">${e.mapaFacial ? '<span class="text-green-600 font-bold text-xs"><i data-lucide="check-circle" class="w-4 h-4 inline"></i> OK</span>' : `<button onclick="openEnrolarModal('${e.id}', '${e.nombre}')" class="bg-purple-100 text-purple-700 px-3 py-1 rounded text-xs font-bold hover:bg-purple-200">Enrolar</button>`}</td>
         <td class="p-3">${e.estatus}</td>
         <td class="p-3 text-right"><button onclick="toggleEstatus('${e.id}', '${e.estatus==='ACTIVO'?'INACTIVO':'ACTIVO'}')" class="bg-gray-200 px-2 py-1 rounded font-bold text-xs">${e.estatus==='ACTIVO'?'Baja':'Alta'}</button></td>
       </tr>
@@ -326,15 +311,27 @@ async function loadEmpleados() {
   toggleLoader(false);
 }
 
-// Lógica de Ventana Modal de Enrolamiento (Extracción 3D)
+// Lógica del Enrolamiento Dual (Cámara en Vivo y Subida de Archivo)
 async function openEnrolarModal(empId, nombre) {
   currentEnrolId = empId;
+  enrolModo = "CAMARA";
+  enrolDescriptor = null;
+  
   document.getElementById('enrolar-nombre').innerText = nombre;
   document.getElementById('modal-enrolar').classList.remove('hidden');
+  
+  const imgPreview = document.getElementById('enrolar-img-preview');
+  if(imgPreview) imgPreview.classList.add('hidden');
+  
+  const fileInput = document.getElementById('enrolar-file');
+  if(fileInput) fileInput.value = "";
+  
+  const video = document.getElementById('enrolar-video');
+  video.classList.remove('hidden');
+  
   document.getElementById('btn-guardar-rostro').disabled = true;
   document.getElementById('btn-guardar-rostro').classList.add('opacity-50', 'cursor-not-allowed');
   
-  const video = document.getElementById('enrolar-video');
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
     video.srcObject = stream;
@@ -343,6 +340,7 @@ async function openEnrolarModal(empId, nombre) {
     video.onplay = () => {
       const canvas = document.getElementById('enrolar-canvas');
       enrolInterval = setInterval(async () => {
+        if(enrolModo !== "CAMARA") return; 
         if(!faceModelsLoaded || video.videoWidth === 0) return;
         const displaySize = { width: video.videoWidth, height: video.videoHeight };
         faceapi.matchDimensions(canvas, displaySize);
@@ -354,42 +352,84 @@ async function openEnrolarModal(empId, nombre) {
            const resizedDetections = faceapi.resizeResults(detection, displaySize);
            faceapi.draw.drawDetections(canvas, resizedDetections);
            document.getElementById('enrolar-status').innerText = "Rostro Detectado. ¡Listo para guardar!";
-           document.getElementById('enrolar-status').classList.replace('text-blue-600', 'text-green-500');
-           
+           document.getElementById('enrolar-status').className = 'text-xs font-bold text-green-500 mb-4';
            enrolDescriptor = detection.descriptor;
            document.getElementById('btn-guardar-rostro').disabled = false;
            document.getElementById('btn-guardar-rostro').classList.remove('opacity-50', 'cursor-not-allowed');
         } else {
            document.getElementById('enrolar-status').innerText = "Buscando rostro...";
-           document.getElementById('enrolar-status').classList.replace('text-green-500', 'text-blue-600');
+           document.getElementById('enrolar-status').className = 'text-xs font-bold text-blue-600 mb-4';
            enrolDescriptor = null;
            document.getElementById('btn-guardar-rostro').disabled = true;
            document.getElementById('btn-guardar-rostro').classList.add('opacity-50', 'cursor-not-allowed');
         }
       }, 300);
     };
-  } catch(e) { showToast("Error de cámara", "error"); }
+  } catch(e) { document.getElementById('enrolar-status').innerText = "Cámara inaccesible. Sube un archivo."; }
+}
+
+async function procesarFotoArchivo(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  
+  enrolModo = "ARCHIVO";
+  clearInterval(enrolInterval);
+  const video = document.getElementById('enrolar-video');
+  if(video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+  video.classList.add('hidden');
+  
+  const preview = document.getElementById('enrolar-img-preview');
+  preview.src = URL.createObjectURL(file);
+  preview.classList.remove('hidden');
+  
+  const canvas = document.getElementById('enrolar-canvas');
+  canvas.getContext('2d').clearRect(0,0, canvas.width, canvas.height);
+  
+  document.getElementById('enrolar-status').innerText = "Procesando foto...";
+  document.getElementById('enrolar-status').className = "text-xs font-bold text-blue-600 mb-4 animate-pulse";
+  
+  toggleLoader(true, 'Analizando imagen...');
+  try {
+     const img = await faceapi.bufferToImage(file);
+     const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+     
+     if (detection) {
+        const displaySize = { width: preview.clientWidth, height: preview.clientHeight };
+        faceapi.matchDimensions(canvas, displaySize);
+        const resizedDetections = faceapi.resizeResults(detection, displaySize);
+        faceapi.draw.drawDetections(canvas, resizedDetections);
+        
+        enrolDescriptor = detection.descriptor;
+        document.getElementById('enrolar-status').innerText = "¡Rostro válido detectado en la foto!";
+        document.getElementById('enrolar-status').className = "text-xs font-bold text-green-600 mb-4";
+        document.getElementById('btn-guardar-rostro').disabled = false;
+        document.getElementById('btn-guardar-rostro').classList.remove('opacity-50', 'cursor-not-allowed');
+     } else {
+        enrolDescriptor = null;
+        document.getElementById('enrolar-status').innerText = "No se detectó rostro claro. Intenta con otra foto.";
+        document.getElementById('enrolar-status').className = "text-xs font-bold text-red-500 mb-4";
+        document.getElementById('btn-guardar-rostro').disabled = true;
+        document.getElementById('btn-guardar-rostro').classList.add('opacity-50', 'cursor-not-allowed');
+     }
+  } catch(err) { showToast("Error al procesar la imagen", "error"); }
+  toggleLoader(false);
 }
 
 function closeEnrolarModal() {
    document.getElementById('modal-enrolar').classList.add('hidden');
    clearInterval(enrolInterval);
    const video = document.getElementById('enrolar-video');
-   if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+   if(video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
 }
 
 async function capturarYGuardarRostro() {
    if(!enrolDescriptor) return;
    toggleLoader(true, 'Guardando Mapa Biométrico...');
-   
-   // Convertimos el arreglo Float32Array a un array tradicional para mandarlo en formato JSON ligero
    const payload = { empleadoId: currentEnrolId, descriptorJson: JSON.stringify(Array.from(enrolDescriptor)) };
-   
    try {
       const res = await runServer('apiEnrolarRostro', payload);
-      if(res.status === 'success') {
-         showToast(res.message); closeEnrolarModal(); loadEmpleados(); 
-      } else showToast(res.message, 'error');
+      if(res.status === 'success') { showToast(res.message); closeEnrolarModal(); loadEmpleados(); } 
+      else showToast(res.message, 'error');
    } catch(e) { showToast('Fallo al guardar', 'error'); }
    toggleLoader(false);
 }
@@ -404,7 +444,7 @@ async function saveEmpleado() {
 async function toggleEstatus(id, newStatus) { toggleLoader(true); await runServer('apiToggleEmpleado', { empleadoId: id, newStatus }); toggleLoader(false); loadEmpleados(); }
 
 // ==========================================
-// SUPER ADMIN: EMPRESAS
+// SUPER ADMIN Y REGISTRO KIOSCO
 // ==========================================
 async function loadEmpresas() {
   toggleLoader(true);
@@ -424,9 +464,6 @@ async function saveEmpresa() {
   if(res.status === 'success') { showToast(res.message); document.getElementById('modal-empresa').classList.add('hidden'); loadEmpresas(); } else showToast(res.message, 'error');
 }
 
-// ==========================================
-// REGISTRO KIOSCO (ONLINE/OFFLINE)
-// ==========================================
 function initGPS() { if(navigator.geolocation) navigator.geolocation.watchPosition( p => { currentLat = p.coords.latitude; currentLng = p.coords.longitude; }, e => {}); }
 
 function toggleQR() {
