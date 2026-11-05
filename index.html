@@ -15,12 +15,14 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   
+  <!-- LIBRERÍA DE INTELIGENCIA ARTIFICIAL (BIOMETRÍA FACIAL) -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+  
   <style>
     .spinner { border-top-color: transparent; }
     .toast { transition: opacity 0.3s ease-in-out; }
   </style>
 </head>
-<!-- h-[100dvh] asegura que tome el 100% de la pantalla real del celular, ignorando la barra de Chrome -->
 <body class="bg-gray-100 flex items-center justify-center h-[100dvh] w-screen overflow-hidden text-gray-800 md:p-4">
   
   <!-- Loader Global -->
@@ -48,22 +50,29 @@
     <button onclick="loginAdmin()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold">Autenticar</button>
   </div>
 
-  <!-- VISTA 3: Kiosco Operativo -->
+  <!-- VISTA 3: Kiosco Operativo (Ahora con IA) -->
   <div id="view-kiosk" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative">
-    <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800"><i data-lucide="arrow-left"></i></button>
-    <h2 class="text-xl font-bold mb-4 mt-4 flex justify-center items-center gap-2"><i data-lucide="fingerprint"></i> Control de Acceso</h2>
+    <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800 z-50"><i data-lucide="arrow-left"></i></button>
+    <h2 class="text-xl font-bold mb-4 mt-4 flex justify-center items-center gap-2">
+      <i data-lucide="fingerprint"></i> Control de Acceso
+    </h2>
     
     <div id="offline-banner" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg mb-4 justify-between items-center text-sm font-bold shadow-inner">
       <span><i data-lucide="wifi-off" class="w-4 h-4 inline mr-1"></i> <span id="offline-count">0</span> regs offline</span>
       <button onclick="syncOffline()" class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Sincronizar</button>
     </div>
 
-    <!-- CÁMARA ALWAYS-ON -->
+    <!-- CÁMARA ALWAYS-ON CON CAPA DE RECONOCIMIENTO FACIAL -->
     <div class="relative w-full h-64 bg-black rounded-lg mb-4 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
       <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
+      <!-- El canvas dibujará un recuadro verde cuando vea una cara -->
+      <canvas id="face-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
       <canvas id="capture-canvas" class="hidden"></canvas>
-      <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-10"></div>
+      <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-20"></div>
     </div>
+    
+    <!-- Mensaje de estado de la IA -->
+    <p id="kiosk-ai-status" class="text-xs text-gray-500 font-semibold mb-4 animate-pulse">Cargando Inteligencia Artificial...</p>
 
     <button onclick="toggleQR()" class="text-sm text-blue-600 font-bold mb-4 flex items-center justify-center w-full gap-1"><i data-lucide="qr-code" class="w-4 h-4"></i> Usar Escáner QR</button>
     <div id="qr-reader" class="w-full mb-4 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
@@ -101,7 +110,6 @@
         </div>
       </div>
       
-      <!-- FIX DEL SCROLL VERTICAL: Agregada la clase min-h-0 aquí también -->
       <div class="flex-1 overflow-auto min-h-0 bg-white relative">
         <table class="w-full text-left border-collapse whitespace-nowrap">
           <thead class="sticky top-0 z-20 bg-gray-200 shadow">
@@ -129,7 +137,6 @@
         <button onclick="document.getElementById('modal-empleado').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">+ Nuevo Empleado</button>
       </div>
       
-      <!-- FIX DEL SCROLL VERTICAL EMPLEADOS -->
       <div class="flex-1 overflow-auto min-h-0 bg-white relative">
         <table class="w-full text-left border-collapse whitespace-nowrap">
           <thead class="sticky top-0 z-20 bg-gray-200 shadow">
@@ -137,8 +144,9 @@
               <th class="p-3">Nombre</th>
               <th class="p-3">PIN</th>
               <th class="p-3">Turno</th>
+              <th class="p-3 text-center">Biometría</th>
               <th class="p-3">Estatus</th>
-              <th class="p-3">Acción</th>
+              <th class="p-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody id="table-empleados"></tbody>
@@ -149,6 +157,7 @@
 
   <!-- VISTA 5: Super Admin -->
   <div id="view-superadmin" class="bg-white w-full h-full md:max-w-5xl md:h-[90vh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
+    <!-- El contenido del Super Admin se mantiene igual... -->
     <div class="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0">
       <h2 class="font-bold text-xl"><i data-lucide="crown" class="inline w-6 h-6 mr-2 text-yellow-400"></i>Panel Maestro</h2>
       <button onclick="logoutAdmin()" class="text-sm bg-red-600 px-4 py-2 rounded font-bold">Salir</button>
@@ -158,23 +167,17 @@
       <button onclick="document.getElementById('modal-empresa').classList.remove('hidden')" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-700">+ Alta de Empresa</button>
     </div>
     
-    <!-- FIX DEL SCROLL VERTICAL EMPRESAS -->
     <div class="flex-1 overflow-auto min-h-0 bg-white relative">
       <table class="w-full text-left border-collapse whitespace-nowrap">
         <thead class="sticky top-0 z-20 bg-gray-200 shadow">
-          <tr class="text-sm">
-            <th class="p-3">ID Local</th>
-            <th class="p-3">Razón Social</th>
-            <th class="p-3">Admin PIN</th>
-            <th class="p-3">Módulos</th>
-          </tr>
+          <tr class="text-sm"><th class="p-3">ID Local</th><th class="p-3">Razón Social</th><th class="p-3">Admin PIN</th><th class="p-3">Módulos</th></tr>
         </thead>
         <tbody id="table-empresas"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- MODALES -->
+  <!-- MODALES EXISTENTES -->
   <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-sm">
       <h3 class="font-bold text-lg mb-4">Alta de Empleado</h3>
@@ -191,17 +194,36 @@
   <div id="modal-empresa" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-sm">
       <h3 class="font-bold text-lg mb-4 text-purple-700">Crear Empresa Cliente</h3>
+      <!-- Campos de empresa omitidos por brevedad visual, siguen igual -->
       <input type="text" id="new-cia-nombre" placeholder="Nombre" class="w-full border p-2 mb-2 rounded">
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <input type="text" id="new-cia-lat" placeholder="Latitud" class="border p-2 rounded">
-        <input type="text" id="new-cia-lng" placeholder="Longitud" class="border p-2 rounded">
-      </div>
+      <div class="grid grid-cols-2 gap-2 mb-2"><input type="text" id="new-cia-lat" placeholder="Latitud" class="border p-2 rounded"><input type="text" id="new-cia-lng" placeholder="Longitud" class="border p-2 rounded"></div>
       <input type="number" id="new-cia-radio" placeholder="Tolerancia Mts" class="w-full border p-2 mb-2 rounded">
       <input type="number" id="new-cia-pin" placeholder="PIN RH" class="w-full border p-2 mb-2 rounded">
       <input type="text" id="new-cia-modulos" placeholder="Módulos" value="BASE,RH" class="w-full border p-2 mb-4 rounded">
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold">Cancelar</button>
         <button onclick="saveEmpresa()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold">Dar de Alta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NUEVO: MODAL PARA ENROLAR ROSTRO -->
+  <div id="modal-enrolar" class="fixed inset-0 bg-black/80 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-sm text-center">
+      <h3 class="font-bold text-lg mb-1">Enrolar Biometría</h3>
+      <p id="enrolar-nombre" class="text-sm text-gray-500 mb-4 font-semibold uppercase"></p>
+      
+      <div class="relative w-full h-64 bg-black rounded-lg mb-4 overflow-hidden shadow-inner flex items-center justify-center">
+        <video id="enrolar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover scale-x-[-1]"></video>
+        <canvas id="enrolar-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
+      </div>
+      
+      <p id="enrolar-status" class="text-xs font-bold text-blue-600 mb-4 animate-pulse">Iniciando cámara...</p>
+      
+      <div class="flex justify-end gap-2 mt-4">
+        <button onclick="closeEnrolarModal()" class="px-4 py-2 bg-gray-200 rounded font-bold">Cancelar</button>
+        <!-- Este botón estará deshabilitado hasta que la IA detecte un rostro claro -->
+        <button id="btn-guardar-rostro" onclick="capturarYGuardarRostro()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold opacity-50 cursor-not-allowed" disabled>Guardar Rostro</button>
       </div>
     </div>
   </div>
