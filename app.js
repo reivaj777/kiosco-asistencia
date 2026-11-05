@@ -165,20 +165,40 @@ async function initKioskAI() {
      showToast('Inicia sesión como Administrador de RH primero para vincular la sucursal.', 'error');
      return;
   }
+  
+  const statusEl = document.getElementById('kiosk-ai-status');
+  
+  // Si no hay internet, saltamos la descarga pero permitimos que el Kiosco funcione con PIN
+  if(!navigator.onLine) {
+    if(statusEl) {
+      statusEl.innerText = "Modo Offline Activo (Usa tu PIN)";
+      statusEl.classList.replace('text-gray-500', 'text-yellow-600');
+    }
+    return;
+  }
+
   try {
      const res = await runServer('apiGetEmpleados', kioskEmpresa.empresaId);
      labeledFaceDescriptors = [];
      for(let e of res.data) {
         if(e.mapaFacial) {
            const arr = new Float32Array(JSON.parse(e.mapaFacial));
-           // Guardamos el PIN como etiqueta para conectarlo directo al Kiosco
            labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(e.pin, [arr])); 
         }
      }
      if(labeledFaceDescriptors.length > 0) {
-        faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55); // Nivel de estrictez
+        faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55);
+        if(statusEl) {
+          statusEl.innerText = "Reconocimiento Facial Activo y Listo";
+          statusEl.classList.replace('text-gray-500', 'text-green-600');
+        }
      }
-  } catch(e) {}
+  } catch(e) {
+    if(statusEl) {
+      statusEl.innerText = "Reconocimiento Facial no disponible (Usa tu PIN)";
+      statusEl.classList.replace('text-gray-500', 'text-red-500');
+    }
+  }
 }
 
 // ==========================================
