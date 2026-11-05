@@ -208,21 +208,34 @@
   </div>
 
   <!-- NUEVO: MODAL PARA ENROLAR ROSTRO -->
+  <!-- MODAL PARA ENROLAR ROSTRO CON PLAN B (SUBIR FOTO) -->
   <div id="modal-enrolar" class="fixed inset-0 bg-black/80 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-sm text-center">
       <h3 class="font-bold text-lg mb-1">Enrolar Biometría</h3>
       <p id="enrolar-nombre" class="text-sm text-gray-500 mb-4 font-semibold uppercase"></p>
       
+      <!-- Contenedor de visualización -->
       <div class="relative w-full h-64 bg-black rounded-lg mb-4 overflow-hidden shadow-inner flex items-center justify-center">
+        <!-- Visualizador de cámara en vivo -->
         <video id="enrolar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover scale-x-[-1]"></video>
+        <!-- Visualizador de la foto cargada (Plan B) -->
+        <img id="enrolar-img-preview" class="absolute inset-0 w-full h-full object-cover hidden">
         <canvas id="enrolar-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
       </div>
       
       <p id="enrolar-status" class="text-xs font-bold text-blue-600 mb-4 animate-pulse">Iniciando cámara...</p>
+
+      <!-- Botón Plan B: Cargar Archivo -->
+      <div class="mb-4">
+        <label for="enrolar-file" class="text-sm text-purple-600 font-bold hover:text-purple-800 cursor-pointer flex items-center justify-center gap-1">
+          <i data-lucide="upload" class="w-4 h-4"></i> O cargar foto desde galería/archivo
+        </label>
+        <!-- Acepta cualquier formato común de imagen -->
+        <input type="file" id="enrolar-file" accept="image/*" class="hidden" onchange="procesarFotoArchivo(event)">
+      </div>
       
       <div class="flex justify-end gap-2 mt-4">
         <button onclick="closeEnrolarModal()" class="px-4 py-2 bg-gray-200 rounded font-bold">Cancelar</button>
-        <!-- Este botón estará deshabilitado hasta que la IA detecte un rostro claro -->
         <button id="btn-guardar-rostro" onclick="capturarYGuardarRostro()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold opacity-50 cursor-not-allowed" disabled>Guardar Rostro</button>
       </div>
     </div>
