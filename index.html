@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Kiosco de Asistencia SaaS — Nova Tech</title>
+  <title>Nova Tech SaaS — Control de Asistencia y Pre-Nómina</title>
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="mobile-web-app-capable" content="yes">
@@ -19,11 +19,15 @@
   <style>
     .spinner { border-top-color: transparent; }
     .toast { transition: opacity 0.3s ease-in-out; }
-    /* Fuerza barras de scroll visibles y fluidas en móviles y PC */
     .scroll-area {
       overflow-y: auto !important;
       overflow-x: auto !important;
       -webkit-overflow-scrolling: touch;
+    }
+    @media print {
+      body * { visibility: hidden; }
+      #badge-print-area, #badge-print-area * { visibility: visible; }
+      #badge-print-area { position: fixed; left: 0; top: 0; width: 100%; }
     }
   </style>
 </head>
@@ -36,14 +40,17 @@
   </div>
 
   <!-- VISTA 1: Menú Principal -->
-  <div id="view-menu" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center m-4">
-    <h1 class="text-2xl font-bold mb-2 text-gray-900">Portal Corporativo</h1>
-    <p class="text-xs text-gray-500 mb-6">Control de Asistencia y Pre-Nómina Inteligente</p>
-    <button onclick="showView('view-kiosk')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 mb-4 shadow">
+  <div id="view-menu" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center m-4 border-t-8 border-blue-600">
+    <div class="inline-flex p-3 rounded-full bg-blue-50 text-blue-600 mb-3">
+      <i data-lucide="shield-check" class="w-8 h-8"></i>
+    </div>
+    <h1 class="text-2xl font-extrabold mb-1 text-gray-900">NOVA TECH</h1>
+    <p class="text-xs text-gray-500 mb-6 font-medium">Asistencia Biométrica y Pre-Nómina LFT</p>
+    <button onclick="showView('view-kiosk')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 mb-4 shadow-lg transition">
       <i data-lucide="monitor-smartphone"></i> Abrir Kiosco Checador
     </button>
-    <button onclick="showView('view-admin')" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 shadow">
-      <i data-lucide="shield-check"></i> Acceso Administradores
+    <button onclick="showView('view-admin')" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 shadow transition">
+      <i data-lucide="lock"></i> Acceso Administradores RH
     </button>
   </div>
 
@@ -58,10 +65,11 @@
   <!-- VISTA 3: Kiosco Operativo -->
   <div id="view-kiosk" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[95dvh] overflow-y-auto">
     <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800 z-50"><i data-lucide="arrow-left"></i></button>
-    <h2 class="text-lg font-bold mb-1 mt-2 flex justify-center items-center gap-2">
-      <i data-lucide="fingerprint" class="text-blue-600"></i> Control de Acceso
+    <h2 class="text-lg font-bold mb-0.5 mt-1 flex justify-center items-center gap-2">
+      <i data-lucide="scan-face" class="text-blue-600"></i> Reloj Checador Inteligente
     </h2>
-    <p id="kiosk-sucursal-badge" class="text-xs font-bold text-blue-700 bg-blue-50 inline-block px-3 py-0.5 rounded-full mb-3">Sucursal Activa</p>
+    <p id="live-clock" class="text-2xl font-mono font-extrabold text-gray-800 mb-1">00:00:00</p>
+    <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-blue-700 bg-blue-50 inline-block px-3 py-0.5 rounded-full mb-3">Sucursal Activa</p>
     
     <div id="offline-banner" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded-lg mb-3 justify-between items-center text-xs font-bold shadow-inner">
       <span><i data-lucide="wifi-off" class="w-4 h-4 inline mr-1"></i> <span id="offline-count">0</span> pendientes</span>
@@ -69,189 +77,290 @@
     </div>
 
     <!-- CÁMARA ALWAYS-ON -->
-    <div class="relative w-full h-56 bg-black rounded-lg mb-2 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
+    <div class="relative w-full h-52 bg-black rounded-lg mb-2 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
       <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
       <canvas id="face-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
       <canvas id="capture-canvas" class="hidden"></canvas>
       <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-20"></div>
     </div>
     
-    <p id="kiosk-ai-status" class="text-xs text-gray-500 font-semibold mb-3">Cargando módulos...</p>
+    <p id="kiosk-ai-status" class="text-xs text-gray-500 font-semibold mb-2">Inicializando sensores...</p>
 
-    <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs text-blue-600 font-bold mb-3 flex items-center justify-center w-full gap-1 py-1 hover:underline">
-      <i data-lucide="qr-code" class="w-4 h-4"></i> Usar Escáner QR
+    <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs text-blue-600 font-bold mb-2 flex items-center justify-center w-full gap-1 py-1 hover:underline">
+      <i data-lucide="qr-code" class="w-4 h-4"></i> Escanear Gafete QR
     </button>
     <div id="qr-reader" class="w-full mb-3 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
 
-    <input type="password" id="pin-input" placeholder="Ingresa tu PIN" class="w-full text-center text-2xl tracking-widest font-bold py-2.5 px-4 border-2 rounded-lg mb-4 outline-none focus:border-blue-500" inputmode="numeric">
+    <input type="password" id="pin-input" placeholder="Ingresa tu PIN" class="w-full text-center text-2xl tracking-widest font-bold py-2 px-4 border-2 rounded-lg mb-3 outline-none focus:border-blue-500" inputmode="numeric">
     
     <div class="grid grid-cols-2 gap-3">
-      <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow">Entrada</button>
-      <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow">Salida</button>
+      <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
+      <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
     </div>
   </div>
 
-  <!-- VISTA 4: Dashboard RH (Estructura Flex Estricta para Scroll Vertical) -->
-  <div id="view-dashboard" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden">
+  <!-- VISTA 4: Dashboard RH -->
+  <div id="view-dashboard" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[94dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden">
     
     <!-- Barra Superior Fija -->
-    <div class="bg-gray-800 text-white px-4 py-3 flex flex-col shrink-0">
+    <div class="bg-gray-900 text-white px-4 py-2.5 flex flex-col shrink-0">
       <div class="flex justify-between items-center mb-2">
         <div>
-          <h2 id="empresa-name" class="font-bold text-lg leading-tight">Módulo RH</h2>
-          <p id="empresa-modulos-badges" class="text-[11px] text-gray-300"></p>
+          <h2 id="empresa-name" class="font-bold text-base md:text-lg leading-tight">Módulo RH</h2>
+          <p id="empresa-modulos-badges" class="text-[10px] text-gray-400"></p>
         </div>
         <button onclick="logoutAdmin()" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded font-bold flex items-center gap-1">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
         </button>
       </div>
-      <div class="flex gap-6 text-sm">
-        <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white">Pre-Nómina</button>
-        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white">Catálogo y Sucursales</button>
+      <div class="flex gap-5 text-xs md:text-sm overflow-x-auto">
+        <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina e Incidencias</button>
+        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Colaboradores y Gafetes</button>
+        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales GPS</button>
       </div>
     </div>
     
-    <!-- TAB 1: Pre-Nómina -->
+    <!-- TAB 1: Pre-Nómina + KPIs Ejecutivos -->
     <div id="tab-prenomina" class="flex-1 flex flex-col min-h-0 overflow-hidden"> 
-      <!-- Controles Compactos -->
-      <div class="p-3 bg-gray-50 border-b flex gap-2 flex-wrap items-end shrink-0 text-xs md:text-sm">
+      <!-- Tarjetas KPI Ejecutivas -->
+      <div class="grid grid-cols-4 gap-2 px-3 pt-2.5 pb-1 bg-gray-50 shrink-0 text-center">
+        <div class="bg-white border rounded-lg p-2 shadow-sm">
+          <p class="text-[10px] text-gray-500 font-bold uppercase">Asistencias</p>
+          <p id="kpi-asistencias" class="text-base md:text-xl font-extrabold text-green-600">0</p>
+        </div>
+        <div class="bg-white border rounded-lg p-2 shadow-sm">
+          <p class="text-[10px] text-gray-500 font-bold uppercase">Retardos</p>
+          <p id="kpi-retardos" class="text-base md:text-xl font-extrabold text-yellow-600">0</p>
+        </div>
+        <div class="bg-white border rounded-lg p-2 shadow-sm">
+          <p class="text-[10px] text-gray-500 font-bold uppercase">Faltas Sin Just.</p>
+          <p id="kpi-faltas" class="text-base md:text-xl font-extrabold text-red-600">0</p>
+        </div>
+        <div class="bg-white border rounded-lg p-2 shadow-sm">
+          <p class="text-[10px] text-gray-500 font-bold uppercase">Hrs Extra (2x/3x)</p>
+          <p id="kpi-extras" class="text-base md:text-xl font-extrabold text-blue-600">0.0 h</p>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros Compacta -->
+      <div class="p-2.5 bg-gray-50 border-b flex gap-2 flex-wrap items-end shrink-0 text-xs">
         <div>
-          <label class="block font-semibold mb-0.5 text-gray-600">Inicio</label>
-          <input type="date" id="date-start" class="border rounded px-2 py-1.5 bg-white">
+          <label class="block font-semibold text-gray-600">Inicio</label>
+          <input type="date" id="date-start" class="border rounded px-2 py-1 bg-white">
         </div>
         <div>
-          <label class="block font-semibold mb-0.5 text-gray-600">Fin</label>
-          <input type="date" id="date-end" class="border rounded px-2 py-1.5 bg-white">
+          <label class="block font-semibold text-gray-600">Fin</label>
+          <input type="date" id="date-end" class="border rounded px-2 py-1 bg-white">
         </div>
         <div>
-          <label class="block font-semibold mb-0.5 text-gray-600">Sucursal</label>
-          <select id="filter-sucursal-report" onchange="filterReport()" class="border rounded px-2 py-1.5 bg-white font-semibold text-gray-700">
-            <option value="TODAS">Todas las sucursales</option>
+          <label class="block font-semibold text-gray-600">Sucursal</label>
+          <select id="filter-sucursal-report" onchange="filterReport()" class="border rounded px-2 py-1 bg-white font-semibold">
+            <option value="TODAS">Todas</option>
           </select>
         </div>
         <div class="flex gap-1.5">
-          <button onclick="loadReports()" class="bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700">Consultar</button>
-          <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700 hidden">CSV</button>
+          <button onclick="loadReports()" class="bg-blue-600 text-white px-3 py-1 rounded font-bold hover:bg-blue-700">Consultar</button>
+          <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-3 py-1 rounded font-bold hover:bg-green-700 hidden">Exportar CONTPAQi</button>
         </div>
-        <div class="ml-auto w-full md:w-56 mt-1 md:mt-0">
+        <div class="ml-auto w-full md:w-52">
           <div class="relative">
-            <i data-lucide="search" class="absolute left-2.5 top-2 w-4 h-4 text-gray-400"></i>
-            <input type="text" id="search-report" oninput="filterReport()" placeholder="Buscar nombre, PIN o ID..." class="border rounded pl-8 pr-3 py-1.5 w-full bg-white outline-none focus:ring-2 focus:ring-blue-400">
+            <i data-lucide="search" class="absolute left-2 top-1.5 w-3.5 h-3.5 text-gray-400"></i>
+            <input type="text" id="search-report" oninput="filterReport()" placeholder="Buscar empleado o PIN..." class="border rounded pl-7 pr-2 py-1 w-full bg-white outline-none focus:ring-1 focus:ring-blue-400">
           </div>
         </div>
       </div>
       
-      <!-- ÁREA DE TABLA CON SCROLL VERTICAL Y HORIZONTAL GARANTIZADO -->
+      <!-- Tabla Pre-Nómina con Scroll Garantizado -->
       <div class="flex-1 min-h-0 scroll-area bg-white relative">
-        <table class="w-full text-left border-collapse whitespace-nowrap text-xs md:text-sm">
-          <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
+        <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
+          <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm text-gray-700">
             <tr>
               <th class="p-2.5">Empleado</th>
               <th class="p-2.5">Sucursal</th>
               <th class="p-2.5">Fecha</th>
               <th class="p-2.5 text-center">Evidencia</th>
-              <th class="p-2.5 text-center">Horarios</th>
+              <th class="p-2.5 text-center">Estatus / Horario</th>
               <th class="p-2.5 text-center">Dobles</th>
               <th class="p-2.5 text-center">Triples</th>
-              <th class="p-2.5">Alertas</th>
+              <th class="p-2.5">Geocerca / Acción</th>
             </tr>
           </thead>
           <tbody id="table-body">
-            <tr><td colspan="8" class="p-6 text-center text-gray-500">Selecciona un rango de fechas y presiona Consultar.</td></tr>
+            <tr><td colspan="8" class="p-6 text-center text-gray-500">Selecciona fechas y presiona Consultar.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- TAB 2: Empleados y Sucursales -->
+    <!-- TAB 2: Empleados, Biometría y Gafetes QR -->
     <div id="tab-empleados" class="flex-1 flex flex-col min-h-0 overflow-hidden hidden">
-      <div class="p-3 bg-gray-50 border-b flex flex-wrap gap-2 justify-between items-center shrink-0 text-xs md:text-sm">
+      <div class="p-3 bg-gray-50 border-b flex flex-wrap gap-2 justify-between items-center shrink-0 text-xs">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-gray-700">Filtrar Sucursal:</span>
+          <span class="font-bold text-gray-700">Sucursal:</span>
           <select id="filter-sucursal-emp" onchange="filterEmpleadosTable()" class="border rounded px-2 py-1.5 bg-white font-semibold">
             <option value="TODAS">Todas</option>
           </select>
         </div>
-        <button onclick="abrirModalNuevoEmpleado()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Empleado</button>
+        <button onclick="abrirModalNuevoEmpleado()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Colaborador</button>
       </div>
       
       <div class="flex-1 min-h-0 scroll-area bg-white relative">
-        <table class="w-full text-left border-collapse whitespace-nowrap text-xs md:text-sm">
+        <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
           <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
             <tr>
-              <th class="p-2.5">Nombre</th>
+              <th class="p-2.5">Colaborador</th>
               <th class="p-2.5">Sucursal</th>
-              <th class="p-2.5">PIN</th>
+              <th class="p-2.5">PIN / Gafete QR</th>
               <th class="p-2.5">Turno</th>
               <th class="p-2.5 text-center">Biometría IA</th>
               <th class="p-2.5">Estatus</th>
-              <th class="p-2.5 text-right">Acciones</th>
+              <th class="p-2.5 text-right">Acción</th>
             </tr>
           </thead>
           <tbody id="table-empleados"></tbody>
         </table>
       </div>
     </div>
+
+    <!-- TAB 3: Configuración de Turnos y Geocercas por Sucursal -->
+    <div id="tab-config" class="flex-1 min-h-0 scroll-area bg-gray-50 p-4 hidden">
+      <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+        
+        <!-- Panel de Turnos -->
+        <div class="bg-white p-4 rounded-xl shadow border">
+          <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-blue-600"></i> Horarios y Turnos LFT</h3>
+          <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
+            <input type="text" id="cfg-turno-id" placeholder="Código (Ej. T1, T2)" class="border p-2 rounded font-bold uppercase">
+            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Matutino)" class="border p-2 rounded">
+          </div>
+          <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
+            <div><label class="text-[10px] font-bold text-gray-500">Entrada</label><input type="time" id="cfg-turno-ent" value="08:00" class="w-full border p-1.5 rounded"></div>
+            <div><label class="text-[10px] font-bold text-gray-500">Salida</label><input type="time" id="cfg-turno-sal" value="17:00" class="w-full border p-1.5 rounded"></div>
+            <div><label class="text-[10px] font-bold text-gray-500">Tolerancia (min)</label><input type="number" id="cfg-turno-tol" value="10" class="w-full border p-1.5 rounded"></div>
+          </div>
+          <button onclick="guardarTurno()" class="w-full bg-blue-600 text-white py-2 rounded font-bold text-xs hover:bg-blue-700 mb-4">Guardar / Actualizar Turno</button>
+          
+          <table class="w-full text-xs border-collapse">
+            <thead><tr class="bg-gray-100"><th class="p-2">ID</th><th class="p-2">Turno</th><th class="p-2">Horario</th><th class="p-2">Tol.</th></tr></thead>
+            <tbody id="table-turnos"></tbody>
+          </table>
+        </div>
+
+        <!-- Panel de Sucursales y Geocercas -->
+        <div class="bg-white p-4 rounded-xl shadow border">
+          <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="map-pin" class="w-4 h-4 text-green-600"></i> Sucursales y Geocercas GPS</h3>
+          <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
+            <input type="text" id="cfg-suc-nombre" placeholder="Nombre (Ej. Planta Norte)" class="border p-2 rounded font-bold">
+            <input type="number" id="cfg-suc-radio" placeholder="Radio Mts (Ej. 150)" value="150" class="border p-2 rounded">
+          </div>
+          <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
+            <input type="text" id="cfg-suc-lat" placeholder="Latitud" class="border p-2 rounded">
+            <input type="text" id="cfg-suc-lng" placeholder="Longitud" class="border p-2 rounded">
+          </div>
+          <div class="flex gap-2 mb-4">
+            <button onclick="capturarGpsActualSucursal()" class="flex-1 bg-gray-200 text-gray-800 py-2 rounded font-bold text-xs hover:bg-gray-300">📍 Usar mi GPS actual</button>
+            <button onclick="guardarSucursal()" class="flex-1 bg-green-600 text-white py-2 rounded font-bold text-xs hover:bg-green-700">Guardar Sucursal</button>
+          </div>
+
+          <table class="w-full text-xs border-collapse">
+            <thead><tr class="bg-gray-100"><th class="p-2">Sucursal</th><th class="p-2">Coordenadas</th><th class="p-2">Radio</th></tr></thead>
+            <tbody id="table-sucursales"></tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
   </div>
 
-  <!-- VISTA 5: Super Admin (Con Checkboxes de Módulos) -->
+  <!-- VISTA 5: Super Admin -->
   <div id="view-superadmin" class="bg-white w-full h-[100dvh] md:max-w-5xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
     <div class="bg-gray-900 text-white px-5 py-3 flex justify-between items-center shrink-0">
       <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS</h2>
       <button onclick="logoutAdmin()" class="text-xs bg-red-600 px-3 py-1.5 rounded font-bold">Salir</button>
     </div>
     <div class="p-3 bg-gray-50 border-b flex justify-between items-center shrink-0">
-      <h3 class="font-bold text-sm md:text-base text-gray-700">Empresas Clientes y Módulos Activos</h3>
-      <button onclick="abrirModalEmpresa()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold hover:bg-purple-700">+ Alta de Empresa</button>
+      <h3 class="font-bold text-sm text-gray-700">Empresas Clientes y Módulos Activos</h3>
+      <button onclick="abrirModalEmpresa()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700">+ Alta de Empresa</button>
     </div>
-    
     <div class="flex-1 min-h-0 scroll-area bg-white relative">
       <table class="w-full text-left border-collapse whitespace-nowrap text-xs md:text-sm">
         <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
-          <tr>
-            <th class="p-3">ID</th>
-            <th class="p-3">Razón Social</th>
-            <th class="p-3">PIN RH</th>
-            <th class="p-3">Módulos Habilitados (Clic para configurar)</th>
-          </tr>
+          <tr><th class="p-3">ID</th><th class="p-3">Razón Social</th><th class="p-3">PIN RH</th><th class="p-3">Módulos Habilitados</th></tr>
         </thead>
         <tbody id="table-empresas"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- MODAL: ALTA DE EMPLEADO (Con campo de Sucursal) -->
+  <!-- MODAL: ALTA DE EMPLEADO -->
   <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-sm shadow-2xl">
-      <h3 class="font-bold text-lg mb-4">Alta de Empleado</h3>
+      <h3 class="font-bold text-lg mb-3">Alta de Colaborador</h3>
       <label class="text-xs font-bold text-gray-600">Nombre Completo</label>
-      <input type="text" id="new-emp-nombre" placeholder="Ej. Juan Pérez" class="w-full border p-2 mb-3 rounded mt-1">
+      <input type="text" id="new-emp-nombre" placeholder="Ej. Juan Pérez" class="w-full border p-2 mb-2 rounded mt-0.5 text-sm">
       
-      <label class="text-xs font-bold text-gray-600">Sucursal / Centro de Trabajo</label>
-      <input type="text" id="new-emp-sucursal" list="lista-sucursales" placeholder="Ej. Sucursal Norte / Obra 1" class="w-full border p-2 mb-3 rounded mt-1">
-      <datalist id="lista-sucursales">
-        <option value="Matriz"></option>
-      </datalist>
+      <label class="text-xs font-bold text-gray-600">Sucursal Asignada</label>
+      <input type="text" id="new-emp-sucursal" list="lista-sucursales" placeholder="Ej. Matriz / Planta Norte" class="w-full border p-2 mb-2 rounded mt-0.5 text-sm">
+      <datalist id="lista-sucursales"><option value="Matriz"></option></datalist>
 
       <div class="grid grid-cols-2 gap-2 mb-4">
         <div>
           <label class="text-xs font-bold text-gray-600">PIN Checador</label>
-          <input type="number" id="new-emp-pin" placeholder="Ej. 1024" class="w-full border p-2 rounded mt-1">
+          <input type="number" id="new-emp-pin" placeholder="Ej. 1024" class="w-full border p-2 rounded mt-0.5 text-sm">
         </div>
         <div>
-          <label class="text-xs font-bold text-gray-600">ID Turno</label>
-          <input type="text" id="new-emp-turno" value="T1" placeholder="T1" class="w-full border p-2 rounded mt-1">
+          <label class="text-xs font-bold text-gray-600">Turno</label>
+          <select id="new-emp-turno" class="w-full border p-2 rounded mt-0.5 text-sm bg-white">
+            <option value="T1">T1</option>
+          </select>
         </div>
       </div>
       
       <div class="flex justify-end gap-2">
-        <button onclick="document.getElementById('modal-empleado').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-sm">Cancelar</button>
-        <button id="btn-save-emp" onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-sm">Guardar</button>
+        <button onclick="document.getElementById('modal-empleado').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button id="btn-save-emp" onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: ALTA Y EDICIÓN DE EMPRESA CON CHECKBOXES DE MÓDULOS -->
+  <!-- MODAL: JUSTIFICAR INCIDENCIA (VACACIONES, IMSS, PERMISO) -->
+  <div id="modal-incidencia" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-sm shadow-2xl">
+      <h3 class="font-bold text-base mb-1">Justificar Ausencia / Incidencia</h3>
+      <p id="inc-emp-info" class="text-xs text-gray-500 font-semibold mb-3"></p>
+      <label class="text-xs font-bold text-gray-600">Tipo de Incidencia Oficial (LFT):</label>
+      <select id="inc-motivo" class="w-full border p-2.5 rounded mt-1 mb-4 text-sm font-bold bg-gray-50">
+        <option value="VACACIONES">🏖️ Vacaciones Autorizadas</option>
+        <option value="INCAPACIDAD_IMSS">🏥 Incapacidad IMSS</option>
+        <option value="PERMISO_GOCE">✅ Permiso con Goce de Sueldo</option>
+        <option value="PERMISO_SIN_GOCE">⏸️ Permiso sin Goce de Sueldo</option>
+        <option value="DESCANSO">🏠 Día de Descanso / Festivo</option>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modal-incidencia').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button onclick="guardarIncidencia()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Aplicar en Pre-Nómina</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GAFETE DIGITAL CON QR IMPRIMIBLE -->
+  <div id="modal-gafete" class="fixed inset-0 bg-black/75 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-xs text-center shadow-2xl">
+      <div id="badge-print-area" class="border-2 border-gray-800 rounded-xl p-4 bg-white">
+        <div class="bg-blue-700 text-white py-1.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider mb-3" id="gafete-empresa">EMPRESA</div>
+        <img id="gafete-qr-img" src="" alt="QR" class="w-36 h-36 mx-auto border p-1 rounded mb-2">
+        <h4 id="gafete-nombre" class="font-extrabold text-base text-gray-900 leading-tight">NOMBRE</h4>
+        <p id="gafete-sucursal" class="text-xs text-blue-600 font-bold mb-1">Sucursal</p>
+        <p id="gafete-pin" class="text-xs font-mono bg-gray-100 inline-block px-3 py-0.5 rounded border">PIN: 0000</p>
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button onclick="document.getElementById('modal-gafete').classList.add('hidden')" class="px-3 py-2 bg-gray-200 rounded font-bold text-xs">Cerrar</button>
+        <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs flex items-center gap-1"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir Gafete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ALTA Y EDICIÓN DE EMPRESA -->
   <div id="modal-empresa" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[90dvh] overflow-y-auto">
       <h3 class="font-bold text-lg mb-3 text-purple-700">Configurar Empresa Cliente</h3>
@@ -263,57 +372,38 @@
       </div>
       <input type="number" id="new-cia-pin" placeholder="PIN de Acceso para RH" class="w-full border p-2 mb-3 rounded text-sm font-bold">
       
-      <p class="text-xs font-bold text-gray-600 uppercase mb-2">Módulos Contratados (Checkboxes):</p>
-      <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs md:text-sm">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" class="chk-modulo w-4 h-4 text-purple-600" value="BIOMETRIA_IA" checked>
-          <span><strong>Reconocimiento Facial IA</strong> (Autodetección en Kiosco)</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" class="chk-modulo w-4 h-4 text-purple-600" value="QR" checked>
-          <span><strong>Escáner de Gafetes QR</strong></span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" class="chk-modulo w-4 h-4 text-purple-600" value="FOTO" checked>
-          <span><strong>Evidencia Fotográfica Anti-Fraude</strong></span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" class="chk-modulo w-4 h-4 text-purple-600" value="GPS" checked>
-          <span><strong>Geocerca GPS y Sucursales</strong></span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" class="chk-modulo w-4 h-4 text-purple-600" value="LFT_PRENOMINA" checked>
-          <span><strong>Motor Pre-Nómina LFT</strong> (Dobles, Triples y CONTPAQi)</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" class="chk-modulo w-4 h-4 text-purple-600" value="CAMPO">
-          <span><strong>Módulo Trabajadores en Campo / Ruta</strong> (+$499)</span>
-        </label>
+      <p class="text-xs font-bold text-gray-600 uppercase mb-2">Módulos Contratados:</p>
+      <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs">
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="BIOMETRIA_IA" checked><span><strong>Reconocimiento Facial IA</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="QR" checked><span><strong>Escáner y Gafetes QR</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="FOTO" checked><span><strong>Evidencia Fotográfica Anti-Fraude</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="GPS" checked><span><strong>Geocerca GPS Multi-Sucursal</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="LFT_PRENOMINA" checked><span><strong>Motor Pre-Nómina LFT e Incidencias</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Trabajadores en Campo</strong></span></label>
       </div>
-
       <div class="flex justify-end gap-2">
-        <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-sm">Cancelar</button>
-        <button id="btn-save-cia" onclick="saveEmpresa()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-sm">Dar de Alta</button>
+        <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button onclick="saveEmpresa()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-xs">Dar de Alta</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: EDITAR MÓDULOS DE EMPRESA EXISTENTE -->
+  <!-- MODAL: EDITAR MÓDULOS DE EMPRESA -->
   <div id="modal-editar-modulos" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
       <h3 class="font-bold text-lg mb-1 text-purple-700">Módulos Activos</h3>
       <p id="edit-mod-empresa-nombre" class="text-xs font-bold text-gray-500 mb-3 uppercase"></p>
-      <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs md:text-sm" id="edit-mod-checkboxes">
+      <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs">
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="BIOMETRIA_IA"><span>Reconocimiento Facial IA</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="QR"><span>Escáner de Gafetes QR</span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="QR"><span>Escáner y Gafetes QR</span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="FOTO"><span>Evidencia Fotográfica</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="GPS"><span>Geocerca GPS y Sucursales</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="LFT_PRENOMINA"><span>Motor Pre-Nómina LFT (Horas Dobles/Triples)</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="CAMPO"><span>Módulo Trabajadores en Campo / Ruta</span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="GPS"><span>Geocerca GPS Multi-Sucursal</span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="LFT_PRENOMINA"><span>Motor Pre-Nómina LFT e Incidencias</span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="CAMPO"><span>Módulo Trabajadores en Campo</span></label>
       </div>
       <div class="flex justify-end gap-2">
-        <button onclick="document.getElementById('modal-editar-modulos').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-sm">Cancelar</button>
-        <button onclick="guardarEdicionModulos()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-sm">Actualizar Módulos</button>
+        <button onclick="document.getElementById('modal-editar-modulos').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button onclick="guardarEdicionModulos()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-xs">Actualizar Módulos</button>
       </div>
     </div>
   </div>
@@ -323,31 +413,26 @@
     <div class="bg-white p-6 rounded-xl w-full max-w-sm text-center">
       <h3 class="font-bold text-lg mb-1">Enrolar Biometría</h3>
       <p id="enrolar-nombre" class="text-sm text-gray-500 mb-4 font-semibold uppercase"></p>
-      
-      <div class="relative w-full h-64 bg-black rounded-lg mb-4 overflow-hidden shadow-inner flex items-center justify-center">
+      <div class="relative w-full h-60 bg-black rounded-lg mb-3 overflow-hidden shadow-inner flex items-center justify-center">
         <video id="enrolar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover scale-x-[-1]"></video>
         <img id="enrolar-img-preview" class="absolute inset-0 w-full h-full object-cover hidden">
         <canvas id="enrolar-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
       </div>
-      
-      <p id="enrolar-status" class="text-xs font-bold text-blue-600 mb-4 animate-pulse">Iniciando cámara...</p>
-
+      <p id="enrolar-status" class="text-xs font-bold text-blue-600 mb-3 animate-pulse">Iniciando cámara...</p>
       <div class="mb-4">
-        <label for="enrolar-file" class="text-sm text-purple-600 font-bold hover:text-purple-800 cursor-pointer flex items-center justify-center gap-1">
-          <i data-lucide="upload" class="w-4 h-4"></i> O cargar foto desde galería/archivo
+        <label for="enrolar-file" class="text-xs text-purple-600 font-bold hover:text-purple-800 cursor-pointer flex items-center justify-center gap-1">
+          <i data-lucide="upload" class="w-4 h-4"></i> O subir fotografía desde archivo
         </label>
         <input type="file" id="enrolar-file" accept="image/*" class="hidden" onchange="procesarFotoArchivo(event)">
       </div>
-      
-      <div class="flex justify-end gap-2 mt-4">
-        <button onclick="closeEnrolarModal()" class="px-4 py-2 bg-gray-200 rounded font-bold text-sm">Cancelar</button>
-        <button id="btn-guardar-rostro" onclick="capturarYGuardarRostro()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-sm opacity-50 cursor-not-allowed" disabled>Guardar Rostro</button>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeEnrolarModal()" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button id="btn-guardar-rostro" onclick="capturarYGuardarRostro()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-xs opacity-50 cursor-not-allowed" disabled>Guardar Rostro</button>
       </div>
     </div>
   </div>
 
   <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2"></div>
-  
   <script src="app.js"></script>
 </body>
 </html>
