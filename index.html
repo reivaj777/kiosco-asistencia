@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Nova Tech SaaS — Control de Asistencia y Cumplimiento LFT 2027</title>
+  <title>Sistema de Control de Asistencia y Pre-Nómina LFT 2027</title>
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="mobile-web-app-capable" content="yes">
@@ -40,12 +40,12 @@
     <p class="font-semibold text-gray-800" id="loader-text">Procesando...</p>
   </div>
 
-  <!-- VISTA 1: Menú Principal -->
+  <!-- VISTA 1: Menú Principal (Marca Blanca) -->
   <div id="view-menu" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center m-4 border-t-8 border-blue-600">
     <div class="inline-flex p-3 rounded-full bg-blue-50 text-blue-600 mb-3">
       <i data-lucide="shield-check" class="w-8 h-8"></i>
     </div>
-    <h1 class="text-2xl font-extrabold mb-1 text-gray-900">NOVA TECH</h1>
+    <h1 class="text-2xl font-extrabold mb-1 text-gray-900">PORTAL DE ASISTENCIA</h1>
     <p class="text-xs text-gray-500 mb-6 font-medium">Cumplimiento STPS • Reforma LFT 2027 • Pre-Nómina</p>
     <button onclick="showView('view-kiosk')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 mb-4 shadow-lg transition">
       <i data-lucide="monitor-smartphone"></i> Abrir Kiosco Checador
@@ -67,7 +67,7 @@
   <div id="view-kiosk" class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[96dvh] overflow-y-auto">
     <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800 z-50"><i data-lucide="arrow-left"></i></button>
     <h2 class="text-base font-bold mb-0.5 mt-1 flex justify-center items-center gap-2">
-      <i data-lucide="scan-face" class="text-blue-600 w-5 h-5"></i> Reloj Checador LFT 2027
+      <i data-lucide="scan-face" class="text-blue-600 w-5 h-5"></i> Reloj Checador Digital
     </h2>
     <p id="live-clock" class="text-2xl font-mono font-extrabold text-gray-800 mb-0.5">00:00:00</p>
     <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-blue-700 bg-blue-50 inline-block px-3 py-0.5 rounded-full mb-2">Sucursal Activa</p>
@@ -99,7 +99,7 @@
       <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1 text-sm"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
       <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1 text-sm"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
     </div>
-    <!-- Botones Secundarios: Pausa de Alimentos / Ley Silla (Recomendación STPS 2027) -->
+    <!-- Botones Secundarios: Pausa de Alimentos / Descanso Intermedio -->
     <div id="kiosk-comida-btns" class="grid grid-cols-2 gap-2.5">
       <button onclick="registrar('INICIO_COMIDA')" class="bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-bold shadow text-xs flex items-center justify-center gap-1"><i data-lucide="utensils" class="w-3.5 h-3.5"></i> Salir a Comer</button>
       <button onclick="registrar('FIN_COMIDA')" class="bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg font-bold shadow text-xs flex items-center justify-center gap-1"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Regresar Comida</button>
@@ -122,7 +122,7 @@
       </div>
       <div class="flex gap-5 text-xs md:text-sm overflow-x-auto">
         <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina STPS 2027</button>
-        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Colaboradores, RFC/CURP y Acuerdos</button>
+        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Expedientes, RFC/CURP y Acuerdos</button>
         <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales GPS</button>
       </div>
     </div>
@@ -198,7 +198,7 @@
       </div>
     </div>
 
-    <!-- TAB 2: Empleados, Edición, RFC/CURP y Carta STPS -->
+    <!-- TAB 2: Expedientes de Empleados, Edición, RFC/CURP y Carta STPS -->
     <div id="tab-empleados" class="flex-1 flex flex-col min-h-0 overflow-hidden hidden">
       <div class="p-3 bg-gray-50 border-b flex flex-wrap gap-2 justify-between items-center shrink-0 text-xs">
         <div class="flex items-center gap-2">
@@ -221,7 +221,7 @@
               <th class="p-2.5">PIN / Gafete</th>
               <th class="p-2.5 text-center">Biometría IA</th>
               <th class="p-2.5 text-center">Acuerdo LFT 2027</th>
-              <th class="p-2.5 text-right">Gestión</th>
+              <th class="p-2.5 text-right">Expediente</th>
             </tr>
           </thead>
           <tbody id="table-empleados"></tbody>
@@ -277,12 +277,12 @@
     </div>
   </div>
 
-  <!-- VISTA 5: Super Admin Pro -->
+  <!-- VISTA 5: Super Admin Pro (Marca Blanca) -->
   <div id="view-superadmin" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
     <div class="bg-gray-900 text-white px-5 py-3 flex justify-between items-center shrink-0">
       <div>
-        <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS — Nova Tech</h2>
-        <p class="text-[11px] text-gray-400">Control de Suscripciones, Rangos de Empleados y Feature Flags</p>
+        <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS</h2>
+        <p class="text-[11px] text-gray-400">Control de Suscripciones, Rangos de Empleados y Módulos por Cliente</p>
       </div>
       <button onclick="logoutAdmin()" class="text-xs bg-red-600 px-3 py-1.5 rounded font-bold">Salir</button>
     </div>
@@ -307,10 +307,10 @@
     </div>
   </div>
 
-  <!-- MODAL: ALTA Y EDICIÓN DE EMPLEADO (CON RFC Y CURP OPCIONAL) -->
+  <!-- MODAL: ALTA Y EDICIÓN DEL EXPEDIENTE DE EMPLEADO (CON RFC Y CURP OPCIONAL) -->
   <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[94dvh] overflow-y-auto">
-      <h3 id="modal-emp-titulo" class="font-bold text-lg mb-3 text-gray-800">Alta de Colaborador</h3>
+      <h3 id="modal-emp-titulo" class="font-bold text-lg mb-3 text-gray-800">Expediente del Colaborador</h3>
       <input type="hidden" id="edit-emp-id">
       
       <label class="text-xs font-bold text-gray-600">Nombre Completo *</label>
@@ -346,12 +346,12 @@
       
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modal-empleado').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
-        <button id="btn-save-emp" onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar Datos</button>
+        <button id="btn-save-emp" onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar Expediente</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: CARTA ACUERDO DE PRUEBA PLENA LFT 2027 Y CONSENTIMIENTO BIOMÉTRICO -->
+  <!-- MODAL: CARTA ACUERDO DE PRUEBA PLENA LFT 2027 (MARCA BLANCA) -->
   <div id="modal-acuerdo-lft" class="fixed inset-0 bg-black/75 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-xl shadow-2xl max-h-[92dvh] overflow-y-auto">
       <div id="acuerdo-print-area" class="text-xs leading-relaxed text-gray-800 space-y-3 p-4 border rounded">
@@ -366,7 +366,7 @@
           <div><strong>SUCURSAL:</strong> <span id="acuerdo-sucursal"></span></div>
           <div><strong>TURNO:</strong> <span id="acuerdo-turno"></span></div>
         </div>
-        <p><strong>PRIMERA (PRUEBA PLENA LFT 2027):</strong> En cumplimiento con la reforma al Artículo 132, fracción XXXIV y Artículo 804 de la Ley Federal del Trabajo vigente a partir de 2027, ambas partes acuerdan de conformidad el uso del sistema electrónico digital <strong>Nova Tech</strong> para el registro de inicio de jornada, pausas de alimentos/descanso y conclusión de jornada laboral, reconociendo que los registros generados mediante PIN, Código QR o Reconocimiento Facial constituyen prueba plena del tiempo efectivamente laborado.</p>
+        <p><strong>PRIMERA (PRUEBA PLENA LFT 2027):</strong> En cumplimiento con la reforma al Artículo 132, fracción XXXIV y Artículo 804 de la Ley Federal del Trabajo vigente a partir de 2027, ambas partes acuerdan de conformidad el uso del Sistema Electrónico Digital Institucional para el registro de inicio de jornada, pausas de alimentos/descanso y conclusión de jornada laboral, reconociendo que los registros generados mediante PIN, Código QR o Reconocimiento Facial constituyen prueba plena del tiempo efectivamente laborado.</p>
         <p><strong>SEGUNDA (PROTECCIÓN DE DATOS Y BIOMETRÍA):</strong> Conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), la persona trabajadora otorga su consentimiento expreso para que el empleador capture únicamente vectores matemáticos de reconocimiento facial, fotografía de evidencia al momento del marcaje y validación de geocerca GPS exclusivamente en el instante de registrar su asistencia, sin realizar rastreo continuo fuera del horario laboral (NOM-037).</p>
         <div class="grid grid-cols-2 gap-8 pt-10 text-center">
           <div class="border-t border-gray-800 pt-1">
@@ -480,6 +480,6 @@
   </div>
 
   <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=2027"></script>
 </body>
 </html>
