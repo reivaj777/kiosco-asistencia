@@ -13,10 +13,10 @@ lucide.createIcons();
 let currentEmpresa = null;
 let currentReportData = [];
 let currentEmpleadosData = [];
+let currentEmpresasList = [];
 let currentLat = null, currentLng = null, base64Photo = null;
 let html5QrcodeScanner = null, videoStream = null;
 let isSavingEmpleado = false;
-let editingEmpresaId = null;
 let selectedIncidenciaTarget = null;
 
 // Variables Biometría IA
@@ -30,13 +30,11 @@ let enrolInterval = null;
 let currentEnrolId = null;
 let enrolModo = "CAMARA";
 
-// Reloj en tiempo real para el Kiosco
 setInterval(() => {
   const clk = document.getElementById('live-clock');
   if(clk) clk.innerText = new Date().toLocaleTimeString('es-MX', { hour12: false });
 }, 1000);
 
-// Síntesis de Voz (Audio Feedback) para el Kiosco
 function hablarKiosco(texto) {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -50,6 +48,16 @@ function hablarKiosco(texto) {
 function tieneModulo(empresaObj, mod) {
   if (!empresaObj || !empresaObj.modulos) return true;
   return String(empresaObj.modulos).toUpperCase().split(',').map(s => s.trim()).includes(mod);
+}
+
+function imprimirElemento(elementId) {
+  document.getElementById(elementId).classList.add('printable-active');
+  window.print();
+}
+
+function cerrarModalImpresion(modalId, elementId) {
+  document.getElementById(elementId).classList.remove('printable-active');
+  document.getElementById(modalId).classList.add('hidden');
 }
 
 // ==========================================
@@ -101,9 +109,11 @@ function showView(viewId) {
 function aplicarModulosKiosco() {
   const badge = document.getElementById('kiosk-sucursal-badge');
   const btnQr = document.getElementById('btn-kiosk-qr');
+  const btnsComida = document.getElementById('kiosk-comida-btns');
   if (kioskEmpresa) {
     badge.innerText = `Empresa Activa: ${kioskEmpresa.nombre}`;
     if (btnQr) btnQr.style.display = tieneModulo(kioskEmpresa, 'QR') ? 'flex' : 'none';
+    if (btnsComida) btnsComida.style.display = tieneModulo(kioskEmpresa, 'LFT_PRENOMINA') ? 'grid' : 'none';
   } else {
     badge.innerText = `Kiosco sin vincular (Inicia sesión en RH una vez)`;
   }
@@ -156,7 +166,7 @@ async function startCamera() {
                  const pinInput = document.getElementById('pin-input');
                  if(pinInput.value !== pinDetectado) {
                      pinInput.value = pinDetectado;
-                     showToast(`Hola ${nombreDetectado}, selecciona Entrada o Salida.`, 'success');
+                     showToast(`Hola ${nombreDetectado}, selecciona tu movimiento.`, 'success');
                      hablarKiosco(`Hola ${nombreDetectado}`);
                  }
                  const drawBox = new faceapi.draw.DrawBox(resizedDetections[i].detection.box, { label: nombreDetectado });
@@ -224,7 +234,7 @@ async function loginAdmin() {
         kioskEmpresa = currentEmpresa; 
         
         document.getElementById('empresa-name').innerText = `RH: ${currentEmpresa.nombre}`;
-        document.getElementById('empresa-modulos-badges').innerText = `Módulos: ${currentEmpresa.modulos || 'COMPLETO'}`;
+        document.getElementById('empresa-modulos-badges').innerText = `Módulos LFT 2027: ${currentEmpresa.modulos || 'COMPLETO'}`;
         const hoy = new Date().toISOString().split('T')[0]; 
         document.getElementById('date-start').value = hoy; 
         document.getElementById('date-end').value = hoy;
@@ -255,7 +265,7 @@ function switchRHTab(tabId) {
 }
 
 // ==========================================
-// PRE-NÓMINA, KPIs E INCIDENCIAS LFT
+// PRE-NÓMINA, 4 MOMENTOS LFT, KPIs E INCIDENCIAS
 // ==========================================
 function actualizarKPIs(data) {
   let asist = 0, ret = 0, faltas = 0, extras = 0;
@@ -301,8 +311,16 @@ function renderReportTable(data) {
       } else if (row.entrada === '--') {
         badgeHorario = `<span class="bg-red-500 text-white px-2 py-0.5 rounded font-bold text-[11px]">FALTA</span>`;
       } else {
-        badgeHorario = `<span class="${row.retardo ? 'text-red-600' : 'text-green-600'} font-bold">${row.entrada}</span> - <span class="font-bold text-gray-700">${row.salida}</span>`;
+        badgeHorario = `<span class="${row.retardo ? 'text-red-600' : 'text-green-600'} font-bold">${row.entrada}</span> a <span class="font-bold text-gray-700">${row.salida}</span>`;
       }
+
+      const infoComida = (row.inicioComida && row.inicioComida !== '--') 
+        ? `<span class="text-[11px] text-gray-600 font-mono">${row.inicioComida} - ${row.finComida}<br><strong class="text-teal-700">(${row.minsComida || 0} min)</strong></span>`
+        : '<span class="text-gray-300">-</span>';
+
+      const infoExtras = (mostrarLFT && (row.dobles > 0 || row.triples > 0))
+        ? `${row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold mr-1">2x: ${row.dobles}h</span>` : ''}${row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold">3x: ${row.triples}h</span>` : ''}`
+        : '-';
 
       const btnJustificar = (row.entrada === '--') 
         ? `<button onclick="abrirModalIncidencia('${row.empId}', '${row.empleado}', '${row.fecha}')" class="text-[11px] bg-gray-100 hover:bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded border ml-1">Justificar</button>` 
@@ -310,14 +328,14 @@ function renderReportTable(data) {
 
       return `
       <tr class="border-b hover:bg-gray-50">
-        <td class="p-2.5 font-bold">${row.empleado} <br><span class="text-[10px] text-gray-500 font-normal">PIN: ${row.pin || row.empId} | Turno: ${row.turnoId}</span></td>
+        <td class="p-2.5 font-bold">${row.empleado} <br><span class="text-[10px] text-gray-500 font-normal">PIN: ${row.pin || row.empId} ${row.rfc ? '| RFC: '+row.rfc : ''}</span></td>
         <td class="p-2.5"><span class="bg-gray-100 border px-2 py-0.5 rounded text-[11px] font-semibold">${row.sucursal || 'Matriz'}</span></td>
         <td class="p-2.5">${row.fecha}</td>
         <td class="p-2.5 text-center">${recuadroFoto}</td>
         <td class="p-2.5 text-center">${badgeHorario}</td>
-        <td class="p-2.5 text-center">${mostrarLFT && row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">${row.dobles} h</span>` : '-'}</td>
-        <td class="p-2.5 text-center">${mostrarLFT && row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">${row.triples} h</span>` : '-'}</td>
-        <td class="p-2.5">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-[10px]">GPS Fuera</span>' : ''}${btnJustificar}</td>
+        <td class="p-2.5 text-center">${infoComida}</td>
+        <td class="p-2.5 text-center">${infoExtras}</td>
+        <td class="p-2.5">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-[10px]">GPS Fuera</span>' : '<span class="text-green-600 font-bold text-[10px]">OK</span>'}${btnJustificar}</td>
       </tr>`;
     }).join('');
     setTimeout(() => lucide.createIcons(), 50);
@@ -333,7 +351,7 @@ function abrirModalIncidencia(empId, nombre, fecha) {
 async function guardarIncidencia() {
   if(!selectedIncidenciaTarget) return;
   const motivo = document.getElementById('inc-motivo').value;
-  toggleLoader(true, 'Aplicando incidencia...');
+  toggleLoader(true, 'Sellando bitácora STPS...');
   try {
     const res = await runServer('apiJustificarIncidencia', {
       empresaId: currentEmpresa.empresaId,
@@ -354,7 +372,10 @@ function filterReport() {
   const query = (document.getElementById('search-report').value || '').toLowerCase();
   const suc = document.getElementById('filter-sucursal-report').value;
   const filtered = currentReportData.filter(r => {
-    const matchText = r.empleado.toLowerCase().includes(query) || String(r.pin || '').toLowerCase().includes(query);
+    const matchText = r.empleado.toLowerCase().includes(query) || 
+                      String(r.pin || '').toLowerCase().includes(query) || 
+                      String(r.rfc || '').toLowerCase().includes(query) || 
+                      String(r.curp || '').toLowerCase().includes(query);
     const matchSuc = (suc === 'TODAS') || ((r.sucursal || 'Matriz') === suc);
     return matchText && matchSuc;
   });
@@ -365,7 +386,7 @@ async function loadReports() {
   if(!currentEmpresa) return;
   const s = document.getElementById('date-start').value, e = document.getElementById('date-end').value;
   if(!s || !e) return; 
-  toggleLoader(true, 'Calculando Pre-Nómina LFT...');
+  toggleLoader(true, 'Calculando Pre-Nómina LFT 2027...');
   try {
     const res = await runServer('apiGetReports', { empresaId: currentEmpresa.empresaId, fechaInicio: s, fechaFin: e });
     currentReportData = res.data || [];
@@ -377,27 +398,44 @@ async function loadReports() {
 
 function exportToCSV() {
   if (currentReportData.length === 0) return;
-  const headers = ["Empleado", "PIN", "Sucursal", "Fecha", "Entrada", "Salida", "Incidencia", "Horas Dobles", "Horas Triples", "Estatus GPS"];
+  const headers = ["Empleado", "RFC", "CURP", "PIN", "Sucursal", "Fecha", "Entrada", "Inicio Comida", "Fin Comida", "Minutos Comida", "Salida", "Incidencia", "Horas Dobles", "Horas Triples", "Auditoría GPS"];
   const query = (document.getElementById('search-report').value || '').toLowerCase();
   const suc = document.getElementById('filter-sucursal-report').value;
   
   const toExport = currentReportData.filter(r => {
-    const matchText = r.empleado.toLowerCase().includes(query) || String(r.pin || '').toLowerCase().includes(query);
+    const matchText = r.empleado.toLowerCase().includes(query) || String(r.pin || '').toLowerCase().includes(query) || String(r.rfc || '').toLowerCase().includes(query);
     const matchSuc = (suc === 'TODAS') || ((r.sucursal || 'Matriz') === suc);
     return matchText && matchSuc;
   });
   
-  const rows = toExport.map(row => [`"${row.empleado}"`, row.pin || '', `"${row.sucursal || 'Matriz'}"`, row.fecha, row.entrada, row.salida, row.incidencia || 'NORMAL', row.dobles, row.triples, row.estatusGeo].join(","));
+  const rows = toExport.map(row => [
+    `"${row.empleado}"`, 
+    row.rfc || '', 
+    row.curp || '', 
+    row.pin || '', 
+    `"${row.sucursal || 'Matriz'}"`, 
+    row.fecha, 
+    row.entrada, 
+    row.inicioComida || '--',
+    row.finComida || '--',
+    row.minsComida || 0,
+    row.salida, 
+    row.incidencia || 'ASISTENCIA_NORMAL', 
+    row.dobles, 
+    row.triples, 
+    row.estatusGeo
+  ].join(","));
+  
   const csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `Prenomina_${currentEmpresa.nombre.replace(/\s+/g, '_')}_${document.getElementById('date-start').value}.csv`;
+  link.download = `Prenomina_STPS_${currentEmpresa.nombre.replace(/\s+/g, '_')}_${document.getElementById('date-start').value}.csv`;
   document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
 // ==========================================
-// COLABORADORES, GAFETES QR Y BIOMETRÍA
+// COLABORADORES: EDICIÓN, RFC/CURP, ACUERDO LFT 2027 Y GAFETES
 // ==========================================
 function actualizarSelectoresSucursales(listaItems) {
   const sucursales = [...new Set(listaItems.map(i => i.sucursal || 'Matriz'))].sort();
@@ -412,7 +450,7 @@ function actualizarSelectoresSucursales(listaItems) {
 
 async function loadEmpleados() {
   if(!currentEmpresa) return;
-  toggleLoader(true, 'Cargando plantilla...');
+  toggleLoader(true, 'Cargando catálogo...');
   try {
     const res = await runServer('apiGetEmpleados', currentEmpresa.empresaId);
     currentEmpleadosData = res.data || [];
@@ -424,57 +462,87 @@ async function loadEmpleados() {
 
 function filterEmpleadosTable() {
   const suc = document.getElementById('filter-sucursal-emp').value;
-  const filtered = currentEmpleadosData.filter(e => suc === 'TODAS' || (e.sucursal || 'Matriz') === suc);
+  const q = (document.getElementById('search-emp-catalog') ? document.getElementById('search-emp-catalog').value : '').toLowerCase();
+  
+  const filtered = currentEmpleadosData.filter(e => {
+    const matchSuc = suc === 'TODAS' || (e.sucursal || 'Matriz') === suc;
+    const matchQ = !q || e.nombre.toLowerCase().includes(q) || String(e.rfc || '').toLowerCase().includes(q) || String(e.curp || '').toLowerCase().includes(q) || String(e.pin || '').includes(q);
+    return matchSuc && matchQ;
+  });
   
   document.getElementById('table-empleados').innerHTML = filtered.length ? filtered.map(e => `
     <tr class="border-b hover:bg-gray-50">
-      <td class="p-2.5 font-bold">${e.nombre}</td>
-      <td class="p-2.5"><span class="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">${e.sucursal || 'Matriz'}</span></td>
-      <td class="p-2.5">
-        <span class="text-blue-600 font-bold mr-2">${e.pin}</span>
-        <button onclick="verGafeteQR('${e.nombre}', '${e.pin}', '${e.sucursal || 'Matriz'}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded border text-[11px] font-bold"><i data-lucide="qr-code" class="w-3 h-3 inline"></i> Gafete</button>
+      <td class="p-2.5 font-bold">${e.nombre} <br><span class="${e.estatus==='ACTIVO'?'text-green-600':'text-red-500'} text-[10px] font-extrabold">${e.estatus}</span></td>
+      <td class="p-2.5 font-mono text-[11px] text-gray-600">
+        <div>RFC: <strong>${e.rfc || 'Sin capturar'}</strong></div>
+        <div>CURP: <strong>${e.curp || 'Sin capturar'}</strong></div>
       </td>
-      <td class="p-2.5 font-semibold">${e.turno}</td>
+      <td class="p-2.5">
+        <span class="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">${e.sucursal || 'Matriz'}</span>
+        <span class="ml-1 font-bold text-gray-600">(${e.turno})</span>
+      </td>
+      <td class="p-2.5">
+        <span class="text-blue-600 font-bold mr-1">${e.pin}</span>
+        <button onclick="verGafeteQR('${e.id}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded border text-[11px] font-bold"><i data-lucide="qr-code" class="w-3 h-3 inline"></i> QR</button>
+      </td>
       <td class="p-2.5 text-center">${e.mapaFacial ? `<button onclick="openEnrolarModal('${e.id}', '${e.nombre}')" class="text-green-600 font-bold text-xs hover:underline"><i data-lucide="check-circle" class="w-3.5 h-3.5 inline"></i> Activo</button>` : `<button onclick="openEnrolarModal('${e.id}', '${e.nombre}')" class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">Enrolar</button>`}</td>
-      <td class="p-2.5"><span class="${e.estatus==='ACTIVO'?'text-green-600':'text-red-500'} font-bold text-xs">${e.estatus}</span></td>
-      <td class="p-2.5 text-right"><button onclick="toggleEstatus('${e.id}', '${e.estatus==='ACTIVO'?'INACTIVO':'ACTIVO'}')" class="bg-gray-200 px-2 py-0.5 rounded font-bold text-xs">${e.estatus==='ACTIVO'?'Baja':'Alta'}</button></td>
+      <td class="p-2.5 text-center">
+        <button onclick="verCartaAcuerdoLFT('${e.id}')" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 mx-auto"><i data-lucide="file-check" class="w-3 h-3"></i> Carta STPS</button>
+      </td>
+      <td class="p-2.5 text-right space-x-1">
+        <button onclick="abrirModalEditarEmpleado('${e.id}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-bold text-xs">Editar</button>
+        <button onclick="toggleEstatus('${e.id}', '${e.estatus==='ACTIVO'?'INACTIVO':'ACTIVO'}')" class="bg-gray-200 hover:bg-gray-300 px-2 py-0.5 rounded font-bold text-xs">${e.estatus==='ACTIVO'?'Baja':'Alta'}</button>
+      </td>
     </tr>
   `).join('') : '<tr><td colspan="7" class="p-6 text-center text-gray-500">Sin colaboradores registrados.</td></tr>';
   lucide.createIcons();
 }
 
-function verGafeteQR(nombre, pin, sucursal) {
-  document.getElementById('gafete-empresa').innerText = currentEmpresa.nombre;
-  document.getElementById('gafete-nombre').innerText = nombre;
-  document.getElementById('gafete-sucursal').innerText = `Sucursal: ${sucursal}`;
-  document.getElementById('gafete-pin').innerText = `PIN: ${pin}`;
-  document.getElementById('gafete-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pin)}`;
-  document.getElementById('modal-gafete').classList.remove('hidden');
-  lucide.createIcons();
-}
-
 function abrirModalNuevoEmpleado() {
+  document.getElementById('modal-emp-titulo').innerText = 'Alta de Nuevo Colaborador';
+  document.getElementById('edit-emp-id').value = '';
   document.getElementById('new-emp-nombre').value = '';
+  document.getElementById('new-emp-rfc').value = '';
+  document.getElementById('new-emp-curp').value = '';
   document.getElementById('new-emp-pin').value = '';
   document.getElementById('new-emp-sucursal').value = '';
   document.getElementById('modal-empleado').classList.remove('hidden');
 }
 
+function abrirModalEditarEmpleado(empId) {
+  const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
+  if(!emp) return;
+  document.getElementById('modal-emp-titulo').innerText = 'Editar Datos del Colaborador';
+  document.getElementById('edit-emp-id').value = emp.id;
+  document.getElementById('new-emp-nombre').value = emp.nombre || '';
+  document.getElementById('new-emp-rfc').value = emp.rfc || '';
+  document.getElementById('new-emp-curp').value = emp.curp || '';
+  document.getElementById('new-emp-pin').value = emp.pin || '';
+  document.getElementById('new-emp-sucursal').value = emp.sucursal || 'Matriz';
+  document.getElementById('new-emp-turno').value = emp.turno || 'T1';
+  document.getElementById('modal-empleado').classList.remove('hidden');
+}
+
 async function saveEmpleado() {
   if (isSavingEmpleado) return;
+  const editId = document.getElementById('edit-emp-id').value;
   const payload = { 
+    id: editId,
     empresaId: currentEmpresa.empresaId, 
     nombre: document.getElementById('new-emp-nombre').value.trim(), 
+    rfc: document.getElementById('new-emp-rfc').value.trim().toUpperCase(),
+    curp: document.getElementById('new-emp-curp').value.trim().toUpperCase(),
     sucursal: document.getElementById('new-emp-sucursal').value.trim() || 'Matriz',
     pin: document.getElementById('new-emp-pin').value.trim(), 
     turnoId: document.getElementById('new-emp-turno').value || 'T1'
   };
-  if(!payload.nombre || !payload.pin) return showToast('Nombre y PIN obligatorios', 'error');
+  if(!payload.nombre || !payload.pin) return showToast('Nombre y PIN son obligatorios', 'error');
   
   isSavingEmpleado = true;
-  toggleLoader(true, 'Guardando colaborador...');
+  const action = editId ? 'apiUpdateEmpleado' : 'apiAddEmpleado';
+  toggleLoader(true, editId ? 'Actualizando colaborador...' : 'Guardando colaborador...');
   try {
-    const res = await runServer('apiAddEmpleado', payload);
+    const res = await runServer(action, payload);
     if(res.status === 'success') { 
       showToast(res.message); 
       document.getElementById('modal-empleado').classList.add('hidden'); 
@@ -482,6 +550,36 @@ async function saveEmpleado() {
     } else showToast(res.message, 'error');
   } catch(e) { showToast('Error al guardar', 'error'); }
   finally { isSavingEmpleado = false; toggleLoader(false); }
+}
+
+function verGafeteQR(empId) {
+  const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
+  if(!emp) return;
+  document.getElementById('gafete-empresa').innerText = currentEmpresa.nombre;
+  document.getElementById('gafete-nombre').innerText = emp.nombre;
+  document.getElementById('gafete-sucursal').innerText = `Sucursal: ${emp.sucursal || 'Matriz'}`;
+  document.getElementById('gafete-rfc').innerText = emp.rfc ? `RFC: ${emp.rfc}` : '';
+  document.getElementById('gafete-pin').innerText = `PIN: ${emp.pin}`;
+  document.getElementById('gafete-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(emp.pin)}`;
+  document.getElementById('modal-gafete').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+function verCartaAcuerdoLFT(empId) {
+  const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
+  if(!emp) return;
+  document.getElementById('acuerdo-fecha').innerText = new Date().toLocaleDateString('es-MX');
+  document.getElementById('acuerdo-empresa').innerText = currentEmpresa.nombre;
+  document.getElementById('acuerdo-nombre').innerText = emp.nombre;
+  document.getElementById('acuerdo-pin').innerText = emp.pin;
+  document.getElementById('acuerdo-rfc').innerText = emp.rfc || '_____________________';
+  document.getElementById('acuerdo-curp').innerText = emp.curp || '_____________________';
+  document.getElementById('acuerdo-sucursal').innerText = emp.sucursal || 'Matriz';
+  document.getElementById('acuerdo-turno').innerText = emp.turno || 'T1';
+  document.getElementById('acuerdo-firma-emp').innerText = emp.nombre;
+  document.getElementById('acuerdo-firma-cia').innerText = currentEmpresa.nombre;
+  document.getElementById('modal-acuerdo-lft').classList.remove('hidden');
+  lucide.createIcons();
 }
 
 async function toggleEstatus(id, newStatus) { 
@@ -645,21 +743,34 @@ async function capturarYGuardarRostro() {
 }
 
 // ==========================================
-// SUPER ADMIN
+// SUPER ADMIN PRO: EDICIÓN COMPLETA Y SUSPENSIÓN
 // ==========================================
 async function loadEmpresas() {
-  toggleLoader(true);
+  toggleLoader(true, 'Cargando clientes SaaS...');
   try {
     const res = await runServer('apiGetEmpresas');
-    document.getElementById('table-empresas').innerHTML = res.data.map(c => {
+    currentEmpresasList = res.data || [];
+    document.getElementById('table-empresas').innerHTML = currentEmpresasList.map(c => {
       const mods = String(c.modulos || '').split(',').filter(Boolean);
       const badges = mods.map(m => `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[10px] font-bold mr-1">${m}</span>`).join('');
+      const rangoPrecio = c.empleadosActivos <= 30 ? 'Rango 1-30' : 'Rango 31-100+';
       return `
       <tr class="border-b hover:bg-gray-50">
-        <td class="p-3 font-bold text-purple-600">${c.id}</td>
+        <td class="p-3">
+          <div class="font-bold text-purple-700">${c.id}</div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${c.estatus==='SUSPENDIDA'?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${c.estatus || 'ACTIVA'}</span>
+        </td>
         <td class="p-3 font-bold">${c.nombre}</td>
+        <td class="p-3 text-center">
+          <span class="font-extrabold text-sm text-blue-600">${c.empleadosActivos}</span> activos<br>
+          <span class="text-[10px] text-gray-500 font-semibold">${rangoPrecio}</span>
+        </td>
         <td class="p-3 font-mono font-bold">${c.pin}</td>
-        <td class="p-3"><div class="flex items-center justify-between gap-2"><div>${badges}</div><button onclick="abrirEditarModulos('${c.id}', '${c.nombre}', '${c.modulos}')" class="bg-gray-800 text-white px-2.5 py-1 rounded text-xs font-bold">Configurar</button></div></td>
+        <td class="p-3">${badges}</td>
+        <td class="p-3 text-right space-x-1">
+          <button onclick="abrirEditarEmpresaCompleta('${c.id}')" class="bg-gray-800 hover:bg-gray-700 text-white px-2.5 py-1 rounded text-xs font-bold">Editar / Módulos</button>
+          <button onclick="toggleStatusEmpresa('${c.id}', '${c.estatus==='SUSPENDIDA'?'ACTIVA':'SUSPENDIDA'}')" class="${c.estatus==='SUSPENDIDA'?'bg-green-600 text-white':'bg-red-100 text-red-700'} px-2.5 py-1 rounded text-xs font-bold">${c.estatus==='SUSPENDIDA'?'Reactivar':'Suspender'}</button>
+        </td>
       </tr>`;
     }).join('');
   } catch(e){} 
@@ -667,14 +778,37 @@ async function loadEmpresas() {
 }
 
 function abrirModalEmpresa() {
+  document.getElementById('modal-cia-titulo').innerText = 'Alta de Nueva Empresa Cliente';
+  document.getElementById('edit-cia-id').value = '';
   document.getElementById('new-cia-nombre').value = '';
+  document.getElementById('new-cia-lat').value = '';
+  document.getElementById('new-cia-lng').value = '';
+  document.getElementById('new-cia-radio').value = '100';
   document.getElementById('new-cia-pin').value = '';
+  document.querySelectorAll('.chk-modulo').forEach(cb => cb.checked = cb.value !== 'CAMPO');
+  document.getElementById('modal-empresa').classList.remove('hidden');
+}
+
+function abrirEditarEmpresaCompleta(id) {
+  const cia = currentEmpresasList.find(x => String(x.id) === String(id));
+  if(!cia) return;
+  document.getElementById('modal-cia-titulo').innerText = `Editar Cliente: ${cia.nombre}`;
+  document.getElementById('edit-cia-id').value = cia.id;
+  document.getElementById('new-cia-nombre').value = cia.nombre || '';
+  document.getElementById('new-cia-lat').value = cia.lat || '';
+  document.getElementById('new-cia-lng').value = cia.lng || '';
+  document.getElementById('new-cia-radio').value = cia.radio || '100';
+  document.getElementById('new-cia-pin').value = cia.pin || '';
+  const activos = String(cia.modulos || '').toUpperCase().split(',').map(s => s.trim());
+  document.querySelectorAll('.chk-modulo').forEach(cb => { cb.checked = activos.includes(cb.value); });
   document.getElementById('modal-empresa').classList.remove('hidden');
 }
 
 async function saveEmpresa() {
+  const editId = document.getElementById('edit-cia-id').value;
   const seleccionados = Array.from(document.querySelectorAll('.chk-modulo:checked')).map(cb => cb.value).join(',');
   const payload = { 
+    id: editId,
     nombre: document.getElementById('new-cia-nombre').value.trim(), 
     lat: document.getElementById('new-cia-lat').value.trim(), 
     lng: document.getElementById('new-cia-lng').value.trim(), 
@@ -683,34 +817,24 @@ async function saveEmpresa() {
     modulos: seleccionados || 'FOTO,GPS'
   };
   if(!payload.nombre || !payload.pin) return showToast('Nombre y PIN obligatorios', 'error');
-  toggleLoader(true, 'Creando empresa...'); 
-  const res = await runServer('apiAddEmpresa', payload); 
+  
+  const action = editId ? 'apiUpdateEmpresa' : 'apiAddEmpresa';
+  toggleLoader(true, editId ? 'Actualizando cliente...' : 'Creando empresa...'); 
+  const res = await runServer(action, payload); 
   toggleLoader(false);
   if(res.status === 'success') { showToast(res.message); document.getElementById('modal-empresa').classList.add('hidden'); loadEmpresas(); } 
   else showToast(res.message, 'error');
 }
 
-function abrirEditarModulos(id, nombre, modulosActuales) {
-  editingEmpresaId = id;
-  document.getElementById('edit-mod-empresa-nombre').innerText = nombre;
-  const activos = String(modulosActuales || '').toUpperCase().split(',').map(s => s.trim());
-  document.querySelectorAll('.chk-edit-mod').forEach(cb => { cb.checked = activos.includes(cb.value); });
-  document.getElementById('modal-editar-modulos').classList.remove('hidden');
-}
-
-async function guardarEdicionModulos() {
-  const seleccionados = Array.from(document.querySelectorAll('.chk-edit-mod:checked')).map(cb => cb.value).join(',');
-  toggleLoader(true, 'Actualizando módulos...');
-  try {
-    const res = await runServer('apiUpdateEmpresaModulos', { empresaId: editingEmpresaId, modulos: seleccionados });
-    if(res.status === 'success') { showToast(res.message); document.getElementById('modal-editar-modulos').classList.add('hidden'); loadEmpresas(); } 
-    else showToast(res.message, 'error');
-  } catch(e) { showToast('Error al actualizar', 'error'); }
+async function toggleStatusEmpresa(empresaId, newStatus) {
+  toggleLoader(true, `Cambiando estatus a ${newStatus}...`);
+  await runServer('apiToggleEmpresaStatus', { empresaId, newStatus });
   toggleLoader(false);
+  loadEmpresas();
 }
 
 // ==========================================
-// REGISTRO KIOSCO (CON VOZ SINTÉTICA Y OFFLINE)
+// REGISTRO KIOSCO (CON 4 MOMENTOS, VOZ Y OFFLINE)
 // ==========================================
 function initGPS() { if(navigator.geolocation) navigator.geolocation.watchPosition( p => { currentLat = p.coords.latitude; currentLng = p.coords.longitude; }, () => {}); }
 
@@ -746,12 +870,12 @@ async function registrar(tipo) {
 
   if(!navigator.onLine) return guardarLocalmente(payload);
 
-  toggleLoader(true, 'Registrando asistencia...');
+  toggleLoader(true, 'Registrando movimiento...');
   try {
     const res = await runServer('apiProcessCheckIn', payload);
     if(res.status === 'success') { 
       showToast(res.message); 
-      hablarKiosco(`${tipo} registrada. Gracias, ${res.empleadoNombre || ''}`);
+      hablarKiosco(`${tipo.replace('_', ' ')} registrada. Gracias, ${res.empleadoNombre || ''}`);
       resetKiosk(); 
     } else {
       showToast(res.message, 'error');
@@ -765,7 +889,7 @@ function guardarLocalmente(payload) {
   let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
   offlineData.push(payload); localStorage.setItem('offline_registros', JSON.stringify(offlineData));
   showToast('Guardado en Memoria Offline', 'success');
-  hablarKiosco(`${payload.tipo} guardada en modo sin conexión`);
+  hablarKiosco(`Movimiento guardado sin conexión`);
   resetKiosk(); updateOfflineUI();
 }
 
