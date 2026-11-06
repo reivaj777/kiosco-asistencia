@@ -583,7 +583,10 @@ function verCartaAcuerdoLFT(empId) {
 }
 
 async function toggleEstatus(id, newStatus) { 
-  toggleLoader(true); await runServer('apiToggleEmpleado', { empleadoId: id, newStatus }); toggleLoader(false); loadEmpleados(); 
+  toggleLoader(true); 
+  await runServer('apiToggleEmpleado', { empresaId: currentEmpresa.empresaId, empleadoId: id, newStatus }); 
+  toggleLoader(false); 
+  loadEmpleados(); 
 }
 
 // ==========================================
@@ -733,7 +736,11 @@ function closeEnrolarModal() {
 async function capturarYGuardarRostro() {
    if(!enrolDescriptor) return;
    toggleLoader(true, 'Guardando Mapa Biométrico...');
-   const payload = { empleadoId: currentEnrolId, descriptorJson: JSON.stringify(Array.from(enrolDescriptor)) };
+   const payload = { 
+     empresaId: currentEmpresa.empresaId, 
+     empleadoId: currentEnrolId, 
+     descriptorJson: JSON.stringify(Array.from(enrolDescriptor)) 
+   };
    try {
       const res = await runServer('apiEnrolarRostro', payload);
       if(res.status === 'success') { showToast(res.message); closeEnrolarModal(); loadEmpleados(); } 
@@ -746,7 +753,7 @@ async function capturarYGuardarRostro() {
 // SUPER ADMIN PRO: EDICIÓN COMPLETA Y SUSPENSIÓN
 // ==========================================
 async function loadEmpresas() {
-  toggleLoader(true, 'Cargando clientes SaaS...');
+  toggleLoader(true, 'Cargando clientes y Shards...');
   try {
     const res = await runServer('apiGetEmpresas');
     currentEmpresasList = res.data || [];
@@ -754,13 +761,19 @@ async function loadEmpresas() {
       const mods = String(c.modulos || '').split(',').filter(Boolean);
       const badges = mods.map(m => `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[10px] font-bold mr-1">${m}</span>`).join('');
       const rangoPrecio = c.empleadosActivos <= 30 ? 'Rango 1-30' : 'Rango 31-100+';
+      
+      // Indicador visual de Base de Datos Independiente (Sharding)
+      const shardBadge = (c.shardId && c.shardId.length > 15)
+        ? `<a href="https://docs.google.com/spreadsheets/d/${c.shardId}" target="_blank" class="inline-block mt-1 bg-teal-100 text-teal-800 border border-teal-300 px-2 py-0.5 rounded text-[10px] font-bold hover:underline">🗄️ BD Propia Aislada ↗</a>`
+        : `<button onclick="migrarShardEmpresa('${c.id}', '${c.nombre}')" class="mt-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-400 px-2 py-0.5 rounded text-[10px] font-bold">⚡ Aislar BD (Crear Archivo Propio)</button>`;
+
       return `
       <tr class="border-b hover:bg-gray-50">
         <td class="p-3">
           <div class="font-bold text-purple-700">${c.id}</div>
           <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${c.estatus==='SUSPENDIDA'?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${c.estatus || 'ACTIVA'}</span>
         </td>
-        <td class="p-3 font-bold">${c.nombre}</td>
+        <td class="p-3 font-bold">${c.nombre}<br>${shardBadge}</td>
         <td class="p-3 text-center">
           <span class="font-extrabold text-sm text-blue-600">${c.empleadosActivos}</span> activos<br>
           <span class="text-[10px] text-gray-500 font-semibold">${rangoPrecio}</span>
@@ -916,4 +929,61 @@ async function syncOffline() {
 function resetKiosk() {
   document.getElementById('pin-input').value = ''; base64Photo = null;
   if(html5QrcodeScanner) { html5QrcodeScanner.clear(); document.getElementById('qr-reader').classList.add('hidden'); }
+}
+async function migrarShardEmpresa(empresaId, nombre) {
+  toggleLoader(true, `Creando Google Sheet independiente para ${nombre}...`);
+  try {
+    const res = await runServer('apiMigrateEmpresaShard', { empresaId });
+    if(res.status === 'success') {
+      showToast(res.message, 'success');
+      loadEmpresas();
+    } else showToast(res.message, 'error');
+  } catch(e) { showToast('Error al crear BD aislada', 'error'); }
+  toggleLoader(false);
+}
+
+async function registrar(tipo) {
+  const pin = document.getElementById('pin-input').value;
+  if(!pin) return showToast('Ingresa tu PIN o acerca tu rostro', 'error');
+  
+  const video = document.getElementById('live-video');
+  const canvas = document.getElementById('capture-canvas');
+  
+  if (tieneModulo(kioskEmpresa, 'FOTO')) {
+    if (!videoStream || video.videoWidth === 0) return showToast('Cámara inactiva', 'error');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const flash = document.getElementById('flash-overlay');
+    if(flash) { flash.classList.replace('opacity-0', 'opacity-100'); setTimeout(() => flash.classList.replace('opacity-100', 'opacity-0'), 150); }
+    base64Photo = canvas.toDataURL('image/jpeg', 0.7);
+  } else { base64Photo = null; }
+  
+  const fechaActual = new Date();
+  const payload = { 
+    empresaId: kioskEmpresa ? kioskEmpresa.empresaId : null, // <--- Enruta la checada al archivo exclusivo del cliente
+    pin: pin, 
+    tipo: tipo, 
+    lat: currentLat, 
+    lng: currentLng, 
+    fotoBase64: base64Photo, 
+    isOffline: !navigator.onLine, 
+    offlineDate: fechaActual.toLocaleDateString('en-CA'), 
+    offlineTime: fechaActual.toLocaleTimeString('en-GB') 
+  };
+
+  if(!navigator.onLine) return guardarLocalmente(payload);
+
+  toggleLoader(true, 'Registrando movimiento...');
+  try {
+    const res = await runServer('apiProcessCheckIn', payload);
+    if(res.status === 'success') { 
+      showToast(res.message); 
+      hablarKiosco(`${tipo.replace('_', ' ')} registrada. Gracias, ${res.empleadoNombre || ''}`);
+      resetKiosk(); 
+    } else {
+      showToast(res.message, 'error');
+      hablarKiosco(res.message);
+    }
+  } catch (e) { guardarLocalmente(payload); } 
+  toggleLoader(false);
 }
