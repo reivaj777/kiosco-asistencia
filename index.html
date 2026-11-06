@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Nova Tech SaaS — Control de Asistencia y Pre-Nómina</title>
+  <title>Nova Tech SaaS — Control de Asistencia y Cumplimiento LFT 2027</title>
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="mobile-web-app-capable" content="yes">
@@ -26,8 +26,9 @@
     }
     @media print {
       body * { visibility: hidden; }
-      #badge-print-area, #badge-print-area * { visibility: visible; }
-      #badge-print-area { position: fixed; left: 0; top: 0; width: 100%; }
+      .printable-active, .printable-active * { visibility: visible; }
+      .printable-active { position: fixed; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
@@ -45,7 +46,7 @@
       <i data-lucide="shield-check" class="w-8 h-8"></i>
     </div>
     <h1 class="text-2xl font-extrabold mb-1 text-gray-900">NOVA TECH</h1>
-    <p class="text-xs text-gray-500 mb-6 font-medium">Asistencia Biométrica y Pre-Nómina LFT</p>
+    <p class="text-xs text-gray-500 mb-6 font-medium">Cumplimiento STPS • Reforma LFT 2027 • Pre-Nómina</p>
     <button onclick="showView('view-kiosk')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold flex justify-center items-center gap-2 mb-4 shadow-lg transition">
       <i data-lucide="monitor-smartphone"></i> Abrir Kiosco Checador
     </button>
@@ -62,22 +63,22 @@
     <button onclick="loginAdmin()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold">Autenticar</button>
   </div>
 
-  <!-- VISTA 3: Kiosco Operativo -->
-  <div id="view-kiosk" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[95dvh] overflow-y-auto">
+  <!-- VISTA 3: Kiosco Operativo (Con 4 Momentos LFT 2027) -->
+  <div id="view-kiosk" class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[96dvh] overflow-y-auto">
     <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800 z-50"><i data-lucide="arrow-left"></i></button>
-    <h2 class="text-lg font-bold mb-0.5 mt-1 flex justify-center items-center gap-2">
-      <i data-lucide="scan-face" class="text-blue-600"></i> Reloj Checador Inteligente
+    <h2 class="text-base font-bold mb-0.5 mt-1 flex justify-center items-center gap-2">
+      <i data-lucide="scan-face" class="text-blue-600 w-5 h-5"></i> Reloj Checador LFT 2027
     </h2>
-    <p id="live-clock" class="text-2xl font-mono font-extrabold text-gray-800 mb-1">00:00:00</p>
-    <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-blue-700 bg-blue-50 inline-block px-3 py-0.5 rounded-full mb-3">Sucursal Activa</p>
+    <p id="live-clock" class="text-2xl font-mono font-extrabold text-gray-800 mb-0.5">00:00:00</p>
+    <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-blue-700 bg-blue-50 inline-block px-3 py-0.5 rounded-full mb-2">Sucursal Activa</p>
     
-    <div id="offline-banner" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded-lg mb-3 justify-between items-center text-xs font-bold shadow-inner">
+    <div id="offline-banner" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-1.5 rounded-lg mb-2 justify-between items-center text-xs font-bold shadow-inner">
       <span><i data-lucide="wifi-off" class="w-4 h-4 inline mr-1"></i> <span id="offline-count">0</span> pendientes</span>
-      <button onclick="syncOffline()" class="bg-yellow-600 text-white px-2 py-1 rounded hover:bg-yellow-700">Sincronizar</button>
+      <button onclick="syncOffline()" class="bg-yellow-600 text-white px-2 py-0.5 rounded hover:bg-yellow-700">Sincronizar</button>
     </div>
 
     <!-- CÁMARA ALWAYS-ON -->
-    <div class="relative w-full h-52 bg-black rounded-lg mb-2 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
+    <div class="relative w-full h-48 bg-black rounded-lg mb-2 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
       <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
       <canvas id="face-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
       <canvas id="capture-canvas" class="hidden"></canvas>
@@ -86,16 +87,22 @@
     
     <p id="kiosk-ai-status" class="text-xs text-gray-500 font-semibold mb-2">Inicializando sensores...</p>
 
-    <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs text-blue-600 font-bold mb-2 flex items-center justify-center w-full gap-1 py-1 hover:underline">
+    <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs text-blue-600 font-bold mb-2 flex items-center justify-center w-full gap-1 py-0.5 hover:underline">
       <i data-lucide="qr-code" class="w-4 h-4"></i> Escanear Gafete QR
     </button>
-    <div id="qr-reader" class="w-full mb-3 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
+    <div id="qr-reader" class="w-full mb-2 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
 
     <input type="password" id="pin-input" placeholder="Ingresa tu PIN" class="w-full text-center text-2xl tracking-widest font-bold py-2 px-4 border-2 rounded-lg mb-3 outline-none focus:border-blue-500" inputmode="numeric">
     
-    <div class="grid grid-cols-2 gap-3">
-      <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
-      <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
+    <!-- Botones Principales: Inicio y Fin de Jornada -->
+    <div class="grid grid-cols-2 gap-2.5 mb-2">
+      <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1 text-sm"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
+      <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1 text-sm"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
+    </div>
+    <!-- Botones Secundarios: Pausa de Alimentos / Ley Silla (Recomendación STPS 2027) -->
+    <div id="kiosk-comida-btns" class="grid grid-cols-2 gap-2.5">
+      <button onclick="registrar('INICIO_COMIDA')" class="bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-bold shadow text-xs flex items-center justify-center gap-1"><i data-lucide="utensils" class="w-3.5 h-3.5"></i> Salir a Comer</button>
+      <button onclick="registrar('FIN_COMIDA')" class="bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg font-bold shadow text-xs flex items-center justify-center gap-1"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Regresar Comida</button>
     </div>
   </div>
 
@@ -114,15 +121,14 @@
         </button>
       </div>
       <div class="flex gap-5 text-xs md:text-sm overflow-x-auto">
-        <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina e Incidencias</button>
-        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Colaboradores y Gafetes</button>
+        <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina STPS 2027</button>
+        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Colaboradores, RFC/CURP y Acuerdos</button>
         <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales GPS</button>
       </div>
     </div>
     
     <!-- TAB 1: Pre-Nómina + KPIs Ejecutivos -->
     <div id="tab-prenomina" class="flex-1 flex flex-col min-h-0 overflow-hidden"> 
-      <!-- Tarjetas KPI Ejecutivas -->
       <div class="grid grid-cols-4 gap-2 px-3 pt-2.5 pb-1 bg-gray-50 shrink-0 text-center">
         <div class="bg-white border rounded-lg p-2 shadow-sm">
           <p class="text-[10px] text-gray-500 font-bold uppercase">Asistencias</p>
@@ -137,7 +143,7 @@
           <p id="kpi-faltas" class="text-base md:text-xl font-extrabold text-red-600">0</p>
         </div>
         <div class="bg-white border rounded-lg p-2 shadow-sm">
-          <p class="text-[10px] text-gray-500 font-bold uppercase">Hrs Extra (2x/3x)</p>
+          <p class="text-[10px] text-gray-500 font-bold uppercase">Hrs Extra (LFT)</p>
           <p id="kpi-extras" class="text-base md:text-xl font-extrabold text-blue-600">0.0 h</p>
         </div>
       </div>
@@ -160,29 +166,29 @@
         </div>
         <div class="flex gap-1.5">
           <button onclick="loadReports()" class="bg-blue-600 text-white px-3 py-1 rounded font-bold hover:bg-blue-700">Consultar</button>
-          <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-3 py-1 rounded font-bold hover:bg-green-700 hidden">Exportar CONTPAQi</button>
+          <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-3 py-1 rounded font-bold hover:bg-green-700 hidden">CSV CONTPAQi / STPS</button>
         </div>
-        <div class="ml-auto w-full md:w-52">
+        <div class="ml-auto w-full md:w-56">
           <div class="relative">
             <i data-lucide="search" class="absolute left-2 top-1.5 w-3.5 h-3.5 text-gray-400"></i>
-            <input type="text" id="search-report" oninput="filterReport()" placeholder="Buscar empleado o PIN..." class="border rounded pl-7 pr-2 py-1 w-full bg-white outline-none focus:ring-1 focus:ring-blue-400">
+            <input type="text" id="search-report" oninput="filterReport()" placeholder="Buscar nombre, RFC, CURP o PIN..." class="border rounded pl-7 pr-2 py-1 w-full bg-white outline-none focus:ring-1 focus:ring-blue-400">
           </div>
         </div>
       </div>
       
-      <!-- Tabla Pre-Nómina con Scroll Garantizado -->
+      <!-- Tabla Pre-Nómina -->
       <div class="flex-1 min-h-0 scroll-area bg-white relative">
         <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
           <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm text-gray-700">
             <tr>
-              <th class="p-2.5">Empleado</th>
+              <th class="p-2.5">Colaborador / RFC</th>
               <th class="p-2.5">Sucursal</th>
               <th class="p-2.5">Fecha</th>
               <th class="p-2.5 text-center">Evidencia</th>
-              <th class="p-2.5 text-center">Estatus / Horario</th>
-              <th class="p-2.5 text-center">Dobles</th>
-              <th class="p-2.5 text-center">Triples</th>
-              <th class="p-2.5">Geocerca / Acción</th>
+              <th class="p-2.5 text-center">Jornada (Ent - Sal)</th>
+              <th class="p-2.5 text-center">Pausa Comida</th>
+              <th class="p-2.5 text-center">Extras (2x / 3x)</th>
+              <th class="p-2.5">Auditoría / Acción</th>
             </tr>
           </thead>
           <tbody id="table-body">
@@ -192,7 +198,7 @@
       </div>
     </div>
 
-    <!-- TAB 2: Empleados, Biometría y Gafetes QR -->
+    <!-- TAB 2: Empleados, Edición, RFC/CURP y Carta STPS -->
     <div id="tab-empleados" class="flex-1 flex flex-col min-h-0 overflow-hidden hidden">
       <div class="p-3 bg-gray-50 border-b flex flex-wrap gap-2 justify-between items-center shrink-0 text-xs">
         <div class="flex items-center gap-2">
@@ -200,6 +206,7 @@
           <select id="filter-sucursal-emp" onchange="filterEmpleadosTable()" class="border rounded px-2 py-1.5 bg-white font-semibold">
             <option value="TODAS">Todas</option>
           </select>
+          <input type="text" id="search-emp-catalog" oninput="filterEmpleadosTable()" placeholder="Filtrar por nombre, RFC o CURP..." class="border rounded px-2.5 py-1.5 bg-white w-48 md:w-64 outline-none">
         </div>
         <button onclick="abrirModalNuevoEmpleado()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Colaborador</button>
       </div>
@@ -209,12 +216,12 @@
           <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
             <tr>
               <th class="p-2.5">Colaborador</th>
-              <th class="p-2.5">Sucursal</th>
-              <th class="p-2.5">PIN / Gafete QR</th>
-              <th class="p-2.5">Turno</th>
+              <th class="p-2.5">RFC / CURP (Opcional)</th>
+              <th class="p-2.5">Sucursal / Turno</th>
+              <th class="p-2.5">PIN / Gafete</th>
               <th class="p-2.5 text-center">Biometría IA</th>
-              <th class="p-2.5">Estatus</th>
-              <th class="p-2.5 text-right">Acción</th>
+              <th class="p-2.5 text-center">Acuerdo LFT 2027</th>
+              <th class="p-2.5 text-right">Gestión</th>
             </tr>
           </thead>
           <tbody id="table-empleados"></tbody>
@@ -226,12 +233,11 @@
     <div id="tab-config" class="flex-1 min-h-0 scroll-area bg-gray-50 p-4 hidden">
       <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
         
-        <!-- Panel de Turnos -->
         <div class="bg-white p-4 rounded-xl shadow border">
           <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-blue-600"></i> Horarios y Turnos LFT</h3>
           <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
             <input type="text" id="cfg-turno-id" placeholder="Código (Ej. T1, T2)" class="border p-2 rounded font-bold uppercase">
-            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Matutino)" class="border p-2 rounded">
+            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Diurno 46h)" class="border p-2 rounded">
           </div>
           <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
             <div><label class="text-[10px] font-bold text-gray-500">Entrada</label><input type="time" id="cfg-turno-ent" value="08:00" class="w-full border p-1.5 rounded"></div>
@@ -246,7 +252,6 @@
           </table>
         </div>
 
-        <!-- Panel de Sucursales y Geocercas -->
         <div class="bg-white p-4 rounded-xl shadow border">
           <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="map-pin" class="w-4 h-4 text-green-600"></i> Sucursales y Geocercas GPS</h3>
           <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
@@ -272,44 +277,67 @@
     </div>
   </div>
 
-  <!-- VISTA 5: Super Admin -->
-  <div id="view-superadmin" class="bg-white w-full h-[100dvh] md:max-w-5xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
+  <!-- VISTA 5: Super Admin Pro -->
+  <div id="view-superadmin" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
     <div class="bg-gray-900 text-white px-5 py-3 flex justify-between items-center shrink-0">
-      <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS</h2>
+      <div>
+        <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS — Nova Tech</h2>
+        <p class="text-[11px] text-gray-400">Control de Suscripciones, Rangos de Empleados y Feature Flags</p>
+      </div>
       <button onclick="logoutAdmin()" class="text-xs bg-red-600 px-3 py-1.5 rounded font-bold">Salir</button>
     </div>
     <div class="p-3 bg-gray-50 border-b flex justify-between items-center shrink-0">
-      <h3 class="font-bold text-sm text-gray-700">Empresas Clientes y Módulos Activos</h3>
-      <button onclick="abrirModalEmpresa()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700">+ Alta de Empresa</button>
+      <h3 class="font-bold text-sm text-gray-700">Empresas Clientes Activas</h3>
+      <button onclick="abrirModalEmpresa()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700">+ Alta de Empresa Cliente</button>
     </div>
     <div class="flex-1 min-h-0 scroll-area bg-white relative">
-      <table class="w-full text-left border-collapse whitespace-nowrap text-xs md:text-sm">
+      <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
         <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
-          <tr><th class="p-3">ID</th><th class="p-3">Razón Social</th><th class="p-3">PIN RH</th><th class="p-3">Módulos Habilitados</th></tr>
+          <tr>
+            <th class="p-3">ID / Estatus</th>
+            <th class="p-3">Razón Social</th>
+            <th class="p-3 text-center">Plantilla Activa</th>
+            <th class="p-3">PIN RH</th>
+            <th class="p-3">Módulos Habilitados</th>
+            <th class="p-3 text-right">Acciones SaaS</th>
+          </tr>
         </thead>
         <tbody id="table-empresas"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- MODAL: ALTA DE EMPLEADO -->
+  <!-- MODAL: ALTA Y EDICIÓN DE EMPLEADO (CON RFC Y CURP OPCIONAL) -->
   <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
-    <div class="bg-white p-6 rounded-xl w-full max-w-sm shadow-2xl">
-      <h3 class="font-bold text-lg mb-3">Alta de Colaborador</h3>
-      <label class="text-xs font-bold text-gray-600">Nombre Completo</label>
-      <input type="text" id="new-emp-nombre" placeholder="Ej. Juan Pérez" class="w-full border p-2 mb-2 rounded mt-0.5 text-sm">
+    <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[94dvh] overflow-y-auto">
+      <h3 id="modal-emp-titulo" class="font-bold text-lg mb-3 text-gray-800">Alta de Colaborador</h3>
+      <input type="hidden" id="edit-emp-id">
       
-      <label class="text-xs font-bold text-gray-600">Sucursal Asignada</label>
-      <input type="text" id="new-emp-sucursal" list="lista-sucursales" placeholder="Ej. Matriz / Planta Norte" class="w-full border p-2 mb-2 rounded mt-0.5 text-sm">
+      <label class="text-xs font-bold text-gray-600">Nombre Completo *</label>
+      <input type="text" id="new-emp-nombre" placeholder="Ej. Juan Pérez López" class="w-full border p-2 mb-2.5 rounded mt-0.5 text-sm">
+      
+      <div class="grid grid-cols-2 gap-2 mb-2.5">
+        <div>
+          <label class="text-xs font-bold text-gray-600">RFC <span class="text-[10px] font-normal text-gray-400">(Opcional)</span></label>
+          <input type="text" id="new-emp-rfc" maxlength="13" placeholder="13 caracteres" class="w-full border p-2 rounded mt-0.5 text-xs font-mono uppercase">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-gray-600">CURP <span class="text-[10px] font-normal text-gray-400">(Opcional)</span></label>
+          <input type="text" id="new-emp-curp" maxlength="18" placeholder="18 caracteres" class="w-full border p-2 rounded mt-0.5 text-xs font-mono uppercase">
+        </div>
+      </div>
+
+      <label class="text-xs font-bold text-gray-600">Sucursal / Centro de Trabajo</label>
+      <input type="text" id="new-emp-sucursal" list="lista-sucursales" placeholder="Ej. Matriz / Planta Norte" class="w-full border p-2 mb-2.5 rounded mt-0.5 text-sm">
       <datalist id="lista-sucursales"><option value="Matriz"></option></datalist>
 
       <div class="grid grid-cols-2 gap-2 mb-4">
         <div>
-          <label class="text-xs font-bold text-gray-600">PIN Checador</label>
-          <input type="number" id="new-emp-pin" placeholder="Ej. 1024" class="w-full border p-2 rounded mt-0.5 text-sm">
+          <label class="text-xs font-bold text-gray-600">PIN Checador *</label>
+          <input type="number" id="new-emp-pin" placeholder="Ej. 1024" class="w-full border p-2 rounded mt-0.5 text-sm font-bold">
         </div>
         <div>
-          <label class="text-xs font-bold text-gray-600">Turno</label>
+          <label class="text-xs font-bold text-gray-600">Turno Asignado</label>
           <select id="new-emp-turno" class="w-full border p-2 rounded mt-0.5 text-sm bg-white">
             <option value="T1">T1</option>
           </select>
@@ -318,12 +346,47 @@
       
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modal-empleado').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
-        <button id="btn-save-emp" onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar</button>
+        <button id="btn-save-emp" onclick="saveEmpleado()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar Datos</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: JUSTIFICAR INCIDENCIA (VACACIONES, IMSS, PERMISO) -->
+  <!-- MODAL: CARTA ACUERDO DE PRUEBA PLENA LFT 2027 Y CONSENTIMIENTO BIOMÉTRICO -->
+  <div id="modal-acuerdo-lft" class="fixed inset-0 bg-black/75 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-xl shadow-2xl max-h-[92dvh] overflow-y-auto">
+      <div id="acuerdo-print-area" class="text-xs leading-relaxed text-gray-800 space-y-3 p-4 border rounded">
+        <h3 class="font-extrabold text-sm text-center uppercase border-b pb-2">Acuerdo de Registro Electrónico de Jornada Laboral y Consentimiento de Datos Biométricos (Art. 132 Fracc. XXXIV LFT)</h3>
+        <p class="text-right font-semibold">Fecha de emisión: <span id="acuerdo-fecha"></span></p>
+        <p>Por medio del presente documento, la empresa <strong id="acuerdo-empresa"></strong> y la persona trabajadora cuyos datos se identifican a continuación:</p>
+        <div class="bg-gray-50 p-3 rounded border grid grid-cols-2 gap-2 font-mono text-[11px]">
+          <div><strong>NOMBRE:</strong> <span id="acuerdo-nombre"></span></div>
+          <div><strong>PIN / ID:</strong> <span id="acuerdo-pin"></span></div>
+          <div><strong>RFC:</strong> <span id="acuerdo-rfc"></span></div>
+          <div><strong>CURP:</strong> <span id="acuerdo-curp"></span></div>
+          <div><strong>SUCURSAL:</strong> <span id="acuerdo-sucursal"></span></div>
+          <div><strong>TURNO:</strong> <span id="acuerdo-turno"></span></div>
+        </div>
+        <p><strong>PRIMERA (PRUEBA PLENA LFT 2027):</strong> En cumplimiento con la reforma al Artículo 132, fracción XXXIV y Artículo 804 de la Ley Federal del Trabajo vigente a partir de 2027, ambas partes acuerdan de conformidad el uso del sistema electrónico digital <strong>Nova Tech</strong> para el registro de inicio de jornada, pausas de alimentos/descanso y conclusión de jornada laboral, reconociendo que los registros generados mediante PIN, Código QR o Reconocimiento Facial constituyen prueba plena del tiempo efectivamente laborado.</p>
+        <p><strong>SEGUNDA (PROTECCIÓN DE DATOS Y BIOMETRÍA):</strong> Conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), la persona trabajadora otorga su consentimiento expreso para que el empleador capture únicamente vectores matemáticos de reconocimiento facial, fotografía de evidencia al momento del marcaje y validación de geocerca GPS exclusivamente en el instante de registrar su asistencia, sin realizar rastreo continuo fuera del horario laboral (NOM-037).</p>
+        <div class="grid grid-cols-2 gap-8 pt-10 text-center">
+          <div class="border-t border-gray-800 pt-1">
+            <p class="font-bold" id="acuerdo-firma-emp"></p>
+            <p class="text-[10px] text-gray-500">Firma de Conformidad de la Persona Trabajadora</p>
+          </div>
+          <div class="border-t border-gray-800 pt-1">
+            <p class="font-bold">Representante Legal / Recursos Humanos</p>
+            <p class="text-[10px] text-gray-500" id="acuerdo-firma-cia"></p>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-4 no-print">
+        <button onclick="cerrarModalImpresion('modal-acuerdo-lft', 'acuerdo-print-area')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cerrar</button>
+        <button onclick="imprimirElemento('acuerdo-print-area')" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs flex items-center gap-1"><i data-lucide="printer" class="w-4 h-4"></i> Imprimir Acuerdo Legal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: JUSTIFICAR INCIDENCIA -->
   <div id="modal-incidencia" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-sm shadow-2xl">
       <h3 class="font-bold text-base mb-1">Justificar Ausencia / Incidencia</h3>
@@ -346,64 +409,48 @@
   <!-- MODAL: GAFETE DIGITAL CON QR IMPRIMIBLE -->
   <div id="modal-gafete" class="fixed inset-0 bg-black/75 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-xs text-center shadow-2xl">
-      <div id="badge-print-area" class="border-2 border-gray-800 rounded-xl p-4 bg-white">
+      <div id="badge-print-area" class="border-2 border-gray-800 rounded-xl p-4 bg-white max-w-xs mx-auto">
         <div class="bg-blue-700 text-white py-1.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider mb-3" id="gafete-empresa">EMPRESA</div>
         <img id="gafete-qr-img" src="" alt="QR" class="w-36 h-36 mx-auto border p-1 rounded mb-2">
         <h4 id="gafete-nombre" class="font-extrabold text-base text-gray-900 leading-tight">NOMBRE</h4>
-        <p id="gafete-sucursal" class="text-xs text-blue-600 font-bold mb-1">Sucursal</p>
+        <p id="gafete-sucursal" class="text-xs text-blue-600 font-bold mb-0.5">Sucursal</p>
+        <p id="gafete-rfc" class="text-[10px] text-gray-500 font-mono mb-1"></p>
         <p id="gafete-pin" class="text-xs font-mono bg-gray-100 inline-block px-3 py-0.5 rounded border">PIN: 0000</p>
       </div>
-      <div class="flex justify-end gap-2 mt-4">
-        <button onclick="document.getElementById('modal-gafete').classList.add('hidden')" class="px-3 py-2 bg-gray-200 rounded font-bold text-xs">Cerrar</button>
-        <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs flex items-center gap-1"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir Gafete</button>
+      <div class="flex justify-end gap-2 mt-4 no-print">
+        <button onclick="cerrarModalImpresion('modal-gafete', 'badge-print-area')" class="px-3 py-2 bg-gray-200 rounded font-bold text-xs">Cerrar</button>
+        <button onclick="imprimirElemento('badge-print-area')" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs flex items-center gap-1"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: ALTA Y EDICIÓN DE EMPRESA -->
+  <!-- MODAL: ALTA Y EDICIÓN DE EMPRESA (SUPER ADMIN) -->
   <div id="modal-empresa" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
-    <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[90dvh] overflow-y-auto">
-      <h3 class="font-bold text-lg mb-3 text-purple-700">Configurar Empresa Cliente</h3>
-      <input type="text" id="new-cia-nombre" placeholder="Razón Social o Nombre Comercial" class="w-full border p-2 mb-2 rounded text-sm">
+    <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[92dvh] overflow-y-auto">
+      <h3 id="modal-cia-titulo" class="font-bold text-lg mb-3 text-purple-700">Configurar Empresa Cliente</h3>
+      <input type="hidden" id="edit-cia-id">
+      <label class="text-xs font-bold text-gray-600">Razón Social o Nombre Comercial</label>
+      <input type="text" id="new-cia-nombre" placeholder="Ej. Constructora del Norte S.A." class="w-full border p-2 mb-2 rounded text-sm mt-0.5">
       <div class="grid grid-cols-3 gap-2 mb-2 text-sm">
-        <input type="text" id="new-cia-lat" placeholder="Latitud" class="border p-2 rounded">
-        <input type="text" id="new-cia-lng" placeholder="Longitud" class="border p-2 rounded">
-        <input type="number" id="new-cia-radio" placeholder="Radio (m)" value="100" class="border p-2 rounded">
+        <div><label class="text-[10px] font-bold text-gray-500">Latitud Matriz</label><input type="text" id="new-cia-lat" placeholder="Latitud" class="w-full border p-2 rounded"></div>
+        <div><label class="text-[10px] font-bold text-gray-500">Longitud Matriz</label><input type="text" id="new-cia-lng" placeholder="Longitud" class="w-full border p-2 rounded"></div>
+        <div><label class="text-[10px] font-bold text-gray-500">Radio (m)</label><input type="number" id="new-cia-radio" value="100" class="w-full border p-2 rounded"></div>
       </div>
-      <input type="number" id="new-cia-pin" placeholder="PIN de Acceso para RH" class="w-full border p-2 mb-3 rounded text-sm font-bold">
+      <label class="text-xs font-bold text-gray-600">PIN de Acceso para RH</label>
+      <input type="number" id="new-cia-pin" placeholder="PIN Administrativo" class="w-full border p-2 mb-3 rounded text-sm font-bold mt-0.5">
       
       <p class="text-xs font-bold text-gray-600 uppercase mb-2">Módulos Contratados:</p>
       <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs">
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="BIOMETRIA_IA" checked><span><strong>Reconocimiento Facial IA</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="BIOMETRIA_IA" checked><span><strong>Reconocimiento Facial IA</strong> (Kiosco Sin Contacto)</span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="QR" checked><span><strong>Escáner y Gafetes QR</strong></span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="FOTO" checked><span><strong>Evidencia Fotográfica Anti-Fraude</strong></span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="GPS" checked><span><strong>Geocerca GPS Multi-Sucursal</strong></span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="LFT_PRENOMINA" checked><span><strong>Motor Pre-Nómina LFT e Incidencias</strong></span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Trabajadores en Campo</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="LFT_PRENOMINA" checked><span><strong>Motor Pre-Nómina LFT 2027, Comidas e Incidencias</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Trabajadores en Campo / Ruta</strong></span></label>
       </div>
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
-        <button onclick="saveEmpresa()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-xs">Dar de Alta</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: EDITAR MÓDULOS DE EMPRESA -->
-  <div id="modal-editar-modulos" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
-    <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
-      <h3 class="font-bold text-lg mb-1 text-purple-700">Módulos Activos</h3>
-      <p id="edit-mod-empresa-nombre" class="text-xs font-bold text-gray-500 mb-3 uppercase"></p>
-      <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs">
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="BIOMETRIA_IA"><span>Reconocimiento Facial IA</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="QR"><span>Escáner y Gafetes QR</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="FOTO"><span>Evidencia Fotográfica</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="GPS"><span>Geocerca GPS Multi-Sucursal</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="LFT_PRENOMINA"><span>Motor Pre-Nómina LFT e Incidencias</span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-edit-mod w-4 h-4" value="CAMPO"><span>Módulo Trabajadores en Campo</span></label>
-      </div>
-      <div class="flex justify-end gap-2">
-        <button onclick="document.getElementById('modal-editar-modulos').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
-        <button onclick="guardarEdicionModulos()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-xs">Actualizar Módulos</button>
+        <button onclick="saveEmpresa()" class="px-4 py-2 bg-purple-600 text-white rounded font-bold text-xs">Guardar Empresa</button>
       </div>
     </div>
   </div>
