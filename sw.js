@@ -1,4 +1,4 @@
-const CACHE_NAME = "kiosco-v3-biometric";
+const CACHE_NAME = "kiosco-v4-lft2027";
 const ASSETS = [
   "./",
   "./index.html",
