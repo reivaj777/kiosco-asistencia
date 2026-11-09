@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1F2937">
+  <meta name="theme-color" content="#0F172A">
   
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -63,46 +63,79 @@
     <button onclick="loginAdmin()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold">Autenticar</button>
   </div>
 
-  <!-- VISTA 3: Kiosco Operativo (Con 4 Momentos LFT 2027) -->
-  <div id="view-kiosk" class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[96dvh] overflow-y-auto">
-    <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800 z-50"><i data-lucide="arrow-left"></i></button>
-    <h2 class="text-base font-bold mb-0.5 mt-1 flex justify-center items-center gap-2">
-      <i data-lucide="scan-face" class="text-blue-600 w-5 h-5"></i> Reloj Checador Digital
-    </h2>
-    <p id="live-clock" class="text-2xl font-mono font-extrabold text-gray-800 mb-0.5">00:00:00</p>
-    <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-blue-700 bg-blue-50 inline-block px-3 py-0.5 rounded-full mb-2">Sucursal Activa</p>
+  <!-- VISTA 3: Kiosco Operativo (Estilo Premium Dark UI + Visor Circular Biométrico) -->
+  <div id="view-kiosk" class="bg-slate-900 text-white p-6 rounded-3xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[96dvh] overflow-y-auto border border-slate-700">
+    <button onclick="showView('view-menu')" class="absolute top-5 left-5 text-slate-400 hover:text-white z-50 bg-slate-800 p-2 rounded-full"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
     
-    <div id="offline-banner" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-1.5 rounded-lg mb-2 justify-between items-center text-xs font-bold shadow-inner">
-      <span><i data-lucide="wifi-off" class="w-4 h-4 inline mr-1"></i> <span id="offline-count">0</span> pendientes</span>
-      <button onclick="syncOffline()" class="bg-yellow-600 text-white px-2 py-0.5 rounded hover:bg-yellow-700">Sincronizar</button>
+    <!-- Encabezado y Reloj -->
+    <p class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mt-1">Registro de Jornada</p>
+    <p id="live-clock" class="text-3xl font-mono font-extrabold text-white tracking-tight mb-1">00:00:00</p>
+    <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-700/60 inline-block px-3 py-0.5 rounded-full mb-3">📍 Sucursal Activa</p>
+    
+    <!-- Banner Offline -->
+    <div id="offline-banner" class="hidden bg-amber-500/20 border border-amber-400 text-amber-300 px-3 py-1.5 rounded-xl mb-3 justify-between items-center text-xs font-bold">
+      <span><i data-lucide="wifi-off" class="w-4 h-4 inline mr-1"></i> <span id="offline-count">0</span> en memoria offline</span>
+      <button onclick="syncOffline()" class="bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-lg font-extrabold hover:bg-amber-400">Sincronizar</button>
     </div>
 
-    <!-- CÁMARA ALWAYS-ON -->
-    <div class="relative w-full h-48 bg-black rounded-lg mb-2 overflow-hidden border-4 border-gray-800 shadow-inner flex items-center justify-center">
-      <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
-      <canvas id="face-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
-      <canvas id="capture-canvas" class="hidden"></canvas>
-      <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-20"></div>
+    <!-- TARJETA FLOTANTE DE BIENVENIDA (Aparece al detectar rostro o QR) -->
+    <div id="kiosk-greeting-card" class="hidden bg-white text-slate-900 px-4 py-2.5 rounded-2xl shadow-2xl mb-3 mx-auto max-w-xs border-2 border-emerald-400 transform transition-all duration-300">
+      <div class="flex items-center justify-center gap-2.5">
+        <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-extrabold text-base" id="kiosk-greeting-avatar">✓</div>
+        <div class="text-left">
+          <p class="font-black text-sm tracking-tight leading-none" id="kiosk-greeting-name">¡HOLA!</p>
+          <p class="text-[11px] text-slate-500 font-medium mt-0.5">Qué bueno verte por aquí 👋</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISOR BIOMÉTRICO CIRCULAR -->
+    <div class="relative w-52 h-52 mx-auto mb-3 flex items-center justify-center">
+      <div id="biometric-ring" class="absolute inset-0 rounded-full border-4 border-dashed border-emerald-400/70 animate-[spin_25s_linear_infinite] pointer-events-none z-20"></div>
+      <div class="relative w-44 h-44 rounded-full bg-black overflow-hidden border-4 border-slate-800 shadow-2xl flex items-center justify-center">
+        <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover scale-x-[-1]"></video>
+        <canvas id="face-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none opacity-80"></canvas>
+        <canvas id="capture-canvas" class="hidden"></canvas>
+        <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-150 pointer-events-none z-30"></div>
+      </div>
     </div>
     
-    <p id="kiosk-ai-status" class="text-xs text-gray-500 font-semibold mb-2">Inicializando sensores...</p>
+    <p id="kiosk-ai-status" class="text-xs text-slate-300 font-semibold mb-3">Acerca tu rostro dentro del círculo</p>
 
-    <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs text-blue-600 font-bold mb-2 flex items-center justify-center w-full gap-1 py-0.5 hover:underline">
-      <i data-lucide="qr-code" class="w-4 h-4"></i> Escanear Gafete QR
-    </button>
-    <div id="qr-reader" class="w-full mb-2 hidden overflow-hidden rounded-lg border-2 border-blue-300"></div>
+    <!-- Lector QR Oculto por defecto -->
+    <div id="qr-reader" class="w-full mb-3 hidden overflow-hidden rounded-xl border-2 border-blue-400 bg-slate-800 text-slate-900"></div>
 
-    <input type="password" id="pin-input" placeholder="Ingresa tu PIN" class="w-full text-center text-2xl tracking-widest font-bold py-2 px-4 border-2 rounded-lg mb-3 outline-none focus:border-blue-500" inputmode="numeric">
+    <!-- Barra de métodos alternativos (QR / PIN Manual) -->
+    <div class="flex justify-center gap-3 mb-3">
+      <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5">
+        <i data-lucide="qr-code" class="w-3.5 h-3.5 text-amber-400"></i> Gafete QR
+      </button>
+      <button onclick="document.getElementById('pin-manual-box').classList.toggle('hidden')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5">
+        <i data-lucide="key-round" class="w-3.5 h-3.5 text-blue-400"></i> Usar PIN
+      </button>
+    </div>
+
+    <!-- Caja de PIN -->
+    <div id="pin-manual-box" class="hidden mb-3">
+      <input type="password" id="pin-input" placeholder="Ingresa tu PIN" class="w-full bg-slate-800 text-white text-center text-xl tracking-widest font-bold py-2 px-4 border border-slate-600 rounded-xl outline-none focus:border-blue-400" inputmode="numeric">
+    </div>
     
-    <!-- Botones Principales: Inicio y Fin de Jornada -->
+    <!-- Botones de Acción (4 Momentos LFT 2027) -->
     <div class="grid grid-cols-2 gap-2.5 mb-2">
-      <button onclick="registrar('ENTRADA')" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1 text-sm"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
-      <button onclick="registrar('SALIDA')" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-1 text-sm"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
+      <button onclick="registrar('ENTRADA')" class="bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-extrabold shadow-lg flex items-center justify-center gap-1.5 text-sm transition"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
+      <button onclick="registrar('SALIDA')" class="bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl font-extrabold shadow-lg flex items-center justify-center gap-1.5 text-sm transition"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
     </div>
-    <!-- Botones Secundarios: Pausa de Alimentos / Descanso Intermedio -->
-    <div id="kiosk-comida-btns" class="grid grid-cols-2 gap-2.5">
-      <button onclick="registrar('INICIO_COMIDA')" class="bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-bold shadow text-xs flex items-center justify-center gap-1"><i data-lucide="utensils" class="w-3.5 h-3.5"></i> Salir a Comer</button>
-      <button onclick="registrar('FIN_COMIDA')" class="bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg font-bold shadow text-xs flex items-center justify-center gap-1"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Regresar Comida</button>
+    <div id="kiosk-comida-btns" class="grid grid-cols-2 gap-2.5 mb-4">
+      <button onclick="registrar('INICIO_COMIDA')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 py-2 rounded-xl font-extrabold shadow text-xs flex items-center justify-center gap-1 transition"><i data-lucide="utensils" class="w-3.5 h-3.5"></i> Salir a Comer</button>
+      <button onclick="registrar('FIN_COMIDA')" class="bg-cyan-600 hover:bg-cyan-500 text-white py-2 rounded-xl font-extrabold shadow text-xs flex items-center justify-center gap-1 transition"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Regresar Comida</button>
+    </div>
+
+    <!-- Píldoras de Ecosistema -->
+    <div class="flex flex-wrap justify-center gap-1.5 pt-2 border-t border-slate-800 text-[10px] text-slate-400 font-semibold">
+      <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span> GPS + Geocerca</span>
+      <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Biometría IA</span>
+      <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> QR</span>
+      <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Ley 40h / LFT</span>
     </div>
   </div>
 
@@ -123,7 +156,7 @@
       <div class="flex gap-5 text-xs md:text-sm overflow-x-auto">
         <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina STPS 2027</button>
         <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Expedientes, RFC/CURP y Acuerdos</button>
-        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales GPS</button>
+        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales / Obras GPS</button>
       </div>
     </div>
     
@@ -159,7 +192,7 @@
           <input type="date" id="date-end" class="border rounded px-2 py-1 bg-white">
         </div>
         <div>
-          <label class="block font-semibold text-gray-600">Sucursal</label>
+          <label class="block font-semibold text-gray-600">Sucursal / Obra</label>
           <select id="filter-sucursal-report" onchange="filterReport()" class="border rounded px-2 py-1 bg-white font-semibold">
             <option value="TODAS">Todas</option>
           </select>
@@ -182,13 +215,13 @@
           <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm text-gray-700">
             <tr>
               <th class="p-2.5">Colaborador / RFC</th>
-              <th class="p-2.5">Sucursal</th>
+              <th class="p-2.5">Sucursal / Obra</th>
               <th class="p-2.5">Fecha</th>
               <th class="p-2.5 text-center">Evidencia</th>
               <th class="p-2.5 text-center">Jornada (Ent - Sal)</th>
               <th class="p-2.5 text-center">Pausa Comida</th>
               <th class="p-2.5 text-center">Extras (2x / 3x)</th>
-              <th class="p-2.5">Auditoría / Acción</th>
+              <th class="p-2.5">Auditoría GPS / Acción</th>
             </tr>
           </thead>
           <tbody id="table-body">
@@ -202,7 +235,7 @@
     <div id="tab-empleados" class="flex-1 flex flex-col min-h-0 overflow-hidden hidden">
       <div class="p-3 bg-gray-50 border-b flex flex-wrap gap-2 justify-between items-center shrink-0 text-xs">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-gray-700">Sucursal:</span>
+          <span class="font-bold text-gray-700">Sucursal / Obra:</span>
           <select id="filter-sucursal-emp" onchange="filterEmpleadosTable()" class="border rounded px-2 py-1.5 bg-white font-semibold">
             <option value="TODAS">Todas</option>
           </select>
@@ -229,7 +262,7 @@
       </div>
     </div>
 
-    <!-- TAB 3: Configuración de Turnos y Geocercas por Sucursal -->
+    <!-- TAB 3: Configuración de Turnos y Geocercas por Sucursal / Obra -->
     <div id="tab-config" class="flex-1 min-h-0 scroll-area bg-gray-50 p-4 hidden">
       <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
         
@@ -237,7 +270,7 @@
           <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-blue-600"></i> Horarios y Turnos LFT</h3>
           <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
             <input type="text" id="cfg-turno-id" placeholder="Código (Ej. T1, T2)" class="border p-2 rounded font-bold uppercase">
-            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Diurno 46h)" class="border p-2 rounded">
+            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Obra Diurno)" class="border p-2 rounded">
           </div>
           <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
             <div><label class="text-[10px] font-bold text-gray-500">Entrada</label><input type="time" id="cfg-turno-ent" value="08:00" class="w-full border p-1.5 rounded"></div>
@@ -253,9 +286,9 @@
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow border">
-          <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="map-pin" class="w-4 h-4 text-green-600"></i> Sucursales y Geocercas GPS</h3>
+          <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="map-pin" class="w-4 h-4 text-green-600"></i> Sucursales / Obras y Geocercas GPS</h3>
           <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
-            <input type="text" id="cfg-suc-nombre" placeholder="Nombre (Ej. Planta Norte)" class="border p-2 rounded font-bold">
+            <input type="text" id="cfg-suc-nombre" placeholder="Nombre (Ej. Obra Norte)" class="border p-2 rounded font-bold">
             <input type="number" id="cfg-suc-radio" placeholder="Radio Mts (Ej. 150)" value="150" class="border p-2 rounded">
           </div>
           <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
@@ -264,11 +297,11 @@
           </div>
           <div class="flex gap-2 mb-4">
             <button onclick="capturarGpsActualSucursal()" class="flex-1 bg-gray-200 text-gray-800 py-2 rounded font-bold text-xs hover:bg-gray-300">📍 Usar mi GPS actual</button>
-            <button onclick="guardarSucursal()" class="flex-1 bg-green-600 text-white py-2 rounded font-bold text-xs hover:bg-green-700">Guardar Sucursal</button>
+            <button onclick="guardarSucursal()" class="flex-1 bg-green-600 text-white py-2 rounded font-bold text-xs hover:bg-green-700">Guardar Geocerca</button>
           </div>
 
           <table class="w-full text-xs border-collapse">
-            <thead><tr class="bg-gray-100"><th class="p-2">Sucursal</th><th class="p-2">Coordenadas</th><th class="p-2">Radio</th></tr></thead>
+            <thead><tr class="bg-gray-100"><th class="p-2">Sucursal / Obra</th><th class="p-2">Coordenadas</th><th class="p-2">Radio</th></tr></thead>
             <tbody id="table-sucursales"></tbody>
           </table>
         </div>
@@ -277,12 +310,12 @@
     </div>
   </div>
 
-  <!-- VISTA 5: Super Admin Pro (Marca Blanca) -->
+  <!-- VISTA 5: Super Admin Pro (Marca Blanca + Sharding) -->
   <div id="view-superadmin" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
     <div class="bg-gray-900 text-white px-5 py-3 flex justify-between items-center shrink-0">
       <div>
         <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS</h2>
-        <p class="text-[11px] text-gray-400">Control de Suscripciones, Rangos de Empleados y Módulos por Cliente</p>
+        <p class="text-[11px] text-gray-400">Control de Suscripciones, Bases de Datos Aisladas (Sharding) y Módulos</p>
       </div>
       <button onclick="logoutAdmin()" class="text-xs bg-red-600 px-3 py-1.5 rounded font-bold">Salir</button>
     </div>
@@ -295,7 +328,7 @@
         <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
           <tr>
             <th class="p-3">ID / Estatus</th>
-            <th class="p-3">Razón Social</th>
+            <th class="p-3">Razón Social / Base de Datos</th>
             <th class="p-3 text-center">Plantilla Activa</th>
             <th class="p-3">PIN RH</th>
             <th class="p-3">Módulos Habilitados</th>
@@ -307,7 +340,7 @@
     </div>
   </div>
 
-  <!-- MODAL: ALTA Y EDICIÓN DEL EXPEDIENTE DE EMPLEADO (CON RFC Y CURP OPCIONAL) -->
+  <!-- MODAL: ALTA Y EDICIÓN DEL EXPEDIENTE DE EMPLEADO -->
   <div id="modal-empleado" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[94dvh] overflow-y-auto">
       <h3 id="modal-emp-titulo" class="font-bold text-lg mb-3 text-gray-800">Expediente del Colaborador</h3>
@@ -327,8 +360,8 @@
         </div>
       </div>
 
-      <label class="text-xs font-bold text-gray-600">Sucursal / Centro de Trabajo</label>
-      <input type="text" id="new-emp-sucursal" list="lista-sucursales" placeholder="Ej. Matriz / Planta Norte" class="w-full border p-2 mb-2.5 rounded mt-0.5 text-sm">
+      <label class="text-xs font-bold text-gray-600">Sucursal / Obra Asignada</label>
+      <input type="text" id="new-emp-sucursal" list="lista-sucursales" placeholder="Ej. Matriz / Obra Norte" class="w-full border p-2 mb-2.5 rounded mt-0.5 text-sm">
       <datalist id="lista-sucursales"><option value="Matriz"></option></datalist>
 
       <div class="grid grid-cols-2 gap-2 mb-4">
@@ -363,7 +396,7 @@
           <div><strong>PIN / ID:</strong> <span id="acuerdo-pin"></span></div>
           <div><strong>RFC:</strong> <span id="acuerdo-rfc"></span></div>
           <div><strong>CURP:</strong> <span id="acuerdo-curp"></span></div>
-          <div><strong>SUCURSAL:</strong> <span id="acuerdo-sucursal"></span></div>
+          <div><strong>SUCURSAL / OBRA:</strong> <span id="acuerdo-sucursal"></span></div>
           <div><strong>TURNO:</strong> <span id="acuerdo-turno"></span></div>
         </div>
         <p><strong>PRIMERA (PRUEBA PLENA LFT 2027):</strong> En cumplimiento con la reforma al Artículo 132, fracción XXXIV y Artículo 804 de la Ley Federal del Trabajo vigente a partir de 2027, ambas partes acuerdan de conformidad el uso del Sistema Electrónico Digital Institucional para el registro de inicio de jornada, pausas de alimentos/descanso y conclusión de jornada laboral, reconociendo que los registros generados mediante PIN, Código QR o Reconocimiento Facial constituyen prueba plena del tiempo efectivamente laborado.</p>
@@ -446,7 +479,7 @@
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="FOTO" checked><span><strong>Evidencia Fotográfica Anti-Fraude</strong></span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="GPS" checked><span><strong>Geocerca GPS Multi-Sucursal</strong></span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="LFT_PRENOMINA" checked><span><strong>Motor Pre-Nómina LFT 2027, Comidas e Incidencias</strong></span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Trabajadores en Campo / Ruta</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Constructoras / Trabajadores en Campo</strong></span></label>
       </div>
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
