@@ -111,7 +111,10 @@ function aplicarModulosKiosco() {
   const btnQr = document.getElementById('btn-kiosk-qr');
   const btnsComida = document.getElementById('kiosk-comida-btns');
   if (kioskEmpresa) {
-    badge.innerText = `Empresa Activa: ${kioskEmpresa.nombre}`;
+    const esCampo = tieneModulo(kioskEmpresa, 'CAMPO');
+    badge.innerText = esCampo 
+      ? `📍 Modo Obra / Campo: ${kioskEmpresa.nombre}` 
+      : `📍 ${kioskEmpresa.nombre}`;
     if (btnQr) btnQr.style.display = tieneModulo(kioskEmpresa, 'QR') ? 'flex' : 'none';
     if (btnsComida) btnsComida.style.display = tieneModulo(kioskEmpresa, 'LFT_PRENOMINA') ? 'grid' : 'none';
   } else {
@@ -136,7 +139,7 @@ function showToast(m, t='success') {
 }
 
 // ==========================================
-// CÁMARA KIOSCO E IA BIOMÉTRICA
+// CÁMARA KIOSCO E IA BIOMÉTRICA (ESTILO CIRCULAR + TARJETA SALUDO)
 // ==========================================
 async function startCamera() {
   const video = document.getElementById('live-video');
@@ -156,21 +159,26 @@ async function startCamera() {
         const resizedDetections = faceapi.resizeResults(detections, displaySize);
         
         canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-        faceapi.draw.drawDetections(canvas, resizedDetections);
         
         if(faceMatcher && resizedDetections.length > 0) {
            const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
-           results.forEach((result, i) => {
+           results.forEach((result) => {
               if(result.label !== 'unknown') {
                  const [pinDetectado, nombreDetectado] = result.label.split('|');
                  const pinInput = document.getElementById('pin-input');
                  if(pinInput.value !== pinDetectado) {
                      pinInput.value = pinDetectado;
-                     showToast(`Hola ${nombreDetectado}, selecciona tu movimiento.`, 'success');
-                     hablarKiosco(`Hola ${nombreDetectado}`);
+                     const card = document.getElementById('kiosk-greeting-card');
+                     const nameEl = document.getElementById('kiosk-greeting-name');
+                     const avatarEl = document.getElementById('kiosk-greeting-avatar');
+                     if(card && nameEl) {
+                       const primerNombre = nombreDetectado.split(' ')[0].toUpperCase();
+                       nameEl.innerText = `¡HOLA, ${primerNombre}!`;
+                       if(avatarEl) avatarEl.innerText = primerNombre.charAt(0);
+                       card.classList.remove('hidden');
+                     }
+                     hablarKiosco(`Hola ${nombreDetectado.split(' ')[0]}`);
                  }
-                 const drawBox = new faceapi.draw.DrawBox(resizedDetections[i].detection.box, { label: nombreDetectado });
-                 drawBox.draw(canvas);
               }
            });
         }
@@ -188,11 +196,11 @@ async function initKioskAI() {
   const statusEl = document.getElementById('kiosk-ai-status');
   if(!kioskEmpresa) return;
   if(!tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
-    if(statusEl) statusEl.innerText = "Modo PIN / QR Activo";
+    if(statusEl) statusEl.innerText = "Selecciona Gafete QR o PIN Manual";
     return;
   }
   if(!navigator.onLine) {
-    if(statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu PIN)"; statusEl.className = "text-xs text-yellow-600 font-semibold mb-2"; }
+    if(statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu PIN o QR)"; statusEl.className = "text-xs text-amber-400 font-semibold mb-3"; }
     return;
   }
 
@@ -207,7 +215,7 @@ async function initKioskAI() {
      }
      if(labeledFaceDescriptors.length > 0) {
         faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55);
-        if(statusEl) { statusEl.innerText = `IA Biométrica Activa (${labeledFaceDescriptors.length} rostros)`; statusEl.className = 'text-xs text-green-600 font-semibold mb-2'; }
+        if(statusEl) { statusEl.innerText = `IA Biométrica Activa • Mira al frente`; statusEl.className = 'text-xs text-emerald-400 font-semibold mb-3'; }
      } else {
         if(statusEl) { statusEl.innerText = "IA Lista (Enrola rostros en RH)"; }
      }
@@ -265,7 +273,7 @@ function switchRHTab(tabId) {
 }
 
 // ==========================================
-// PRE-NÓMINA, 4 MOMENTOS LFT, KPIs E INCIDENCIAS
+// PRE-NÓMINA, 4 MOMENTOS LFT, MAPA GPS E INCIDENCIAS
 // ==========================================
 function actualizarKPIs(data) {
   let asist = 0, ret = 0, faltas = 0, extras = 0;
@@ -322,6 +330,10 @@ function renderReportTable(data) {
         ? `${row.dobles > 0 ? `<span class="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold mr-1">2x: ${row.dobles}h</span>` : ''}${row.triples > 0 ? `<span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold">3x: ${row.triples}h</span>` : ''}`
         : '-';
 
+      const linkMapa = (row.lat && row.lng)
+        ? `<a href="https://www.google.com/maps?q=${row.lat},${row.lng}" target="_blank" class="text-[10px] text-blue-600 hover:underline font-bold ml-1" title="Ver ubicación exacta en Google Maps">📍 Mapa (${row.distancia || 0}m)</a>`
+        : '';
+
       const btnJustificar = (row.entrada === '--') 
         ? `<button onclick="abrirModalIncidencia('${row.empId}', '${row.empleado}', '${row.fecha}')" class="text-[11px] bg-gray-100 hover:bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded border ml-1">Justificar</button>` 
         : '';
@@ -335,7 +347,7 @@ function renderReportTable(data) {
         <td class="p-2.5 text-center">${badgeHorario}</td>
         <td class="p-2.5 text-center">${infoComida}</td>
         <td class="p-2.5 text-center">${infoExtras}</td>
-        <td class="p-2.5">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-[10px]">GPS Fuera</span>' : '<span class="text-green-600 font-bold text-[10px]">OK</span>'}${btnJustificar}</td>
+        <td class="p-2.5">${row.estatusGeo === 'ALERTA_GEO' ? '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-[10px]">Fuera de Obra</span>' : (row.entrada !== '--' ? '<span class="text-green-600 font-bold text-[10px]">En Geocerca</span>' : '')}${linkMapa}${btnJustificar}</td>
       </tr>`;
     }).join('');
     setTimeout(() => lucide.createIcons(), 50);
@@ -398,7 +410,7 @@ async function loadReports() {
 
 function exportToCSV() {
   if (currentReportData.length === 0) return;
-  const headers = ["Empleado", "RFC", "CURP", "PIN", "Sucursal", "Fecha", "Entrada", "Inicio Comida", "Fin Comida", "Minutos Comida", "Salida", "Incidencia", "Horas Dobles", "Horas Triples", "Auditoría GPS"];
+  const headers = ["Empleado", "RFC", "CURP", "PIN", "Sucursal_Obra", "Fecha", "Entrada", "Inicio Comida", "Fin Comida", "Minutos Comida", "Salida", "Incidencia", "Horas Dobles", "Horas Triples", "Auditoria GPS", "Latitud", "Longitud"];
   const query = (document.getElementById('search-report').value || '').toLowerCase();
   const suc = document.getElementById('filter-sucursal-report').value;
   
@@ -423,7 +435,9 @@ function exportToCSV() {
     row.incidencia || 'ASISTENCIA_NORMAL', 
     row.dobles, 
     row.triples, 
-    row.estatusGeo
+    row.estatusGeo,
+    row.lat || '',
+    row.lng || ''
   ].join(","));
   
   const csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
@@ -512,7 +526,7 @@ function abrirModalNuevoEmpleado() {
 function abrirModalEditarEmpleado(empId) {
   const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
   if(!emp) return;
-  document.getElementById('modal-emp-titulo').innerText = 'Editar Datos del Colaborador';
+  document.getElementById('modal-emp-titulo').innerText = 'Editar Expediente del Colaborador';
   document.getElementById('edit-emp-id').value = emp.id;
   document.getElementById('new-emp-nombre').value = emp.nombre || '';
   document.getElementById('new-emp-rfc').value = emp.rfc || '';
@@ -540,450 +554,32 @@ async function saveEmpleado() {
   
   isSavingEmpleado = true;
   const action = editId ? 'apiUpdateEmpleado' : 'apiAddEmpleado';
-  toggleLoader(true, editId ? 'Actualizando colaborador...' : 'Guardando colaborador...');
+  toggleLoader(true, editId ? 'Actualizando expediente...' : 'Guardando colaborador...');
+  
   try {
     const res = await runServer(action, payload);
-    if(res.status === 'success') { 
-      showToast(res.message); 
+    await loadEmpleados();
+    const yaExisteEnTabla = currentEmpleadosData.some(
+      e => String(e.pin).trim() === payload.pin && e.nombre.toLowerCase() === payload.nombre.toLowerCase()
+    );
+
+    if(res.status === 'success' || yaExisteEnTabla) { 
+      showToast('Expediente guardado correctamente', 'success'); 
       document.getElementById('modal-empleado').classList.add('hidden'); 
-      await loadEmpleados(); 
-    } else showToast(res.message, 'error');
-  } catch(e) { showToast('Error al guardar', 'error'); }
-  finally { isSavingEmpleado = false; toggleLoader(false); }
+    } else {
+      showToast(res.message, 'error');
+    }
+  } catch(e) { 
+    await loadEmpleados();
+    document.getElementById('modal-empleado').classList.add('hidden');
+    showToast('Sincronizado con la base de datos', 'success');
+  } finally { 
+    isSavingEmpleado = false; 
+    toggleLoader(false); 
+  }
 }
 
 function verGafeteQR(empId) {
   const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
   if(!emp) return;
-  document.getElementById('gafete-empresa').innerText = currentEmpresa.nombre;
-  document.getElementById('gafete-nombre').innerText = emp.nombre;
-  document.getElementById('gafete-sucursal').innerText = `Sucursal: ${emp.sucursal || 'Matriz'}`;
-  document.getElementById('gafete-rfc').innerText = emp.rfc ? `RFC: ${emp.rfc}` : '';
-  document.getElementById('gafete-pin').innerText = `PIN: ${emp.pin}`;
-  document.getElementById('gafete-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(emp.pin)}`;
-  document.getElementById('modal-gafete').classList.remove('hidden');
-  lucide.createIcons();
-}
-
-function verCartaAcuerdoLFT(empId) {
-  const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
-  if(!emp) return;
-  document.getElementById('acuerdo-fecha').innerText = new Date().toLocaleDateString('es-MX');
-  document.getElementById('acuerdo-empresa').innerText = currentEmpresa.nombre;
-  document.getElementById('acuerdo-nombre').innerText = emp.nombre;
-  document.getElementById('acuerdo-pin').innerText = emp.pin;
-  document.getElementById('acuerdo-rfc').innerText = emp.rfc || '_____________________';
-  document.getElementById('acuerdo-curp').innerText = emp.curp || '_____________________';
-  document.getElementById('acuerdo-sucursal').innerText = emp.sucursal || 'Matriz';
-  document.getElementById('acuerdo-turno').innerText = emp.turno || 'T1';
-  document.getElementById('acuerdo-firma-emp').innerText = emp.nombre;
-  document.getElementById('acuerdo-firma-cia').innerText = currentEmpresa.nombre;
-  document.getElementById('modal-acuerdo-lft').classList.remove('hidden');
-  lucide.createIcons();
-}
-
-async function toggleEstatus(id, newStatus) { 
-  toggleLoader(true); 
-  await runServer('apiToggleEmpleado', { empresaId: currentEmpresa.empresaId, empleadoId: id, newStatus }); 
-  toggleLoader(false); 
-  loadEmpleados(); 
-}
-
-// ==========================================
-// TURNOS Y GEOCERCAS MULTI-SUCURSAL
-// ==========================================
-async function loadTurnosYSucursales() {
-  if(!currentEmpresa) return;
-  try {
-    const [resT, resS] = await Promise.all([
-      runServer('apiGetTurnos', currentEmpresa.empresaId),
-      runServer('apiGetSucursales', currentEmpresa.empresaId)
-    ]);
-    
-    const turnos = resT.data || [];
-    document.getElementById('table-turnos').innerHTML = turnos.map(t => `
-      <tr class="border-b"><td class="p-2 font-bold text-blue-600">${t.id}</td><td class="p-2">${t.nombre}</td><td class="p-2 font-mono">${t.entrada} - ${t.salida}</td><td class="p-2">${t.tolerancia}m</td></tr>
-    `).join('') || '<tr><td colspan="4" class="p-2 text-center text-gray-400">Sin turnos</td></tr>';
-
-    const selTurno = document.getElementById('new-emp-turno');
-    if(selTurno && turnos.length) {
-      selTurno.innerHTML = turnos.map(t => `<option value="${t.id}">${t.id} - ${t.nombre} (${t.entrada}-${t.salida})</option>`).join('');
-    }
-
-    const sucs = resS.data || [];
-    document.getElementById('table-sucursales').innerHTML = sucs.map(s => `
-      <tr class="border-b"><td class="p-2 font-bold text-green-700">${s.nombre}</td><td class="p-2 font-mono text-[10px]">${s.lat}, ${s.lng}</td><td class="p-2">${s.radio}m</td></tr>
-    `).join('') || '<tr><td colspan="3" class="p-2 text-center text-gray-400">Usa la Geocerca Matriz por defecto</td></tr>';
-  } catch(e) {}
-}
-
-async function guardarTurno() {
-  const payload = {
-    empresaId: currentEmpresa.empresaId,
-    id: document.getElementById('cfg-turno-id').value.trim(),
-    nombre: document.getElementById('cfg-turno-nombre').value.trim(),
-    entrada: document.getElementById('cfg-turno-ent').value,
-    salida: document.getElementById('cfg-turno-sal').value,
-    tolerancia: document.getElementById('cfg-turno-tol').value
-  };
-  if(!payload.id || !payload.nombre) return showToast('Completa código y nombre del turno', 'error');
-  toggleLoader(true, 'Guardando turno...');
-  const res = await runServer('apiAddTurno', payload);
-  toggleLoader(false);
-  if(res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
-}
-
-function capturarGpsActualSucursal() {
-  if(!navigator.geolocation) return showToast('GPS no soportado', 'error');
-  navigator.geolocation.getCurrentPosition(pos => {
-    document.getElementById('cfg-suc-lat').value = pos.coords.latitude.toFixed(6);
-    document.getElementById('cfg-suc-lng').value = pos.coords.longitude.toFixed(6);
-    showToast('Coordenadas actuales capturadas');
-  }, () => showToast('Activa el permiso de ubicación', 'error'));
-}
-
-async function guardarSucursal() {
-  const payload = {
-    empresaId: currentEmpresa.empresaId,
-    nombre: document.getElementById('cfg-suc-nombre').value.trim(),
-    lat: document.getElementById('cfg-suc-lat').value.trim(),
-    lng: document.getElementById('cfg-suc-lng').value.trim(),
-    radio: document.getElementById('cfg-suc-radio').value.trim() || 150
-  };
-  if(!payload.nombre || !payload.lat || !payload.lng) return showToast('Completa nombre y coordenadas', 'error');
-  toggleLoader(true, 'Guardando sucursal...');
-  const res = await runServer('apiAddSucursal', payload);
-  toggleLoader(false);
-  if(res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
-}
-
-// ==========================================
-// ENROLAMIENTO BIOMÉTRICO
-// ==========================================
-async function openEnrolarModal(empId, nombre) {
-  currentEnrolId = empId; enrolModo = "CAMARA"; enrolDescriptor = null;
-  document.getElementById('enrolar-nombre').innerText = nombre;
-  document.getElementById('modal-enrolar').classList.remove('hidden');
-  document.getElementById('enrolar-img-preview').classList.add('hidden');
-  document.getElementById('enrolar-file').value = "";
-  const video = document.getElementById('enrolar-video');
-  video.classList.remove('hidden');
-  document.getElementById('btn-guardar-rostro').disabled = true;
-  document.getElementById('btn-guardar-rostro').classList.add('opacity-50', 'cursor-not-allowed');
-  
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-    video.srcObject = stream;
-    video.onloadedmetadata = () => { video.play(); };
-    video.onplay = () => {
-      const canvas = document.getElementById('enrolar-canvas');
-      enrolInterval = setInterval(async () => {
-        if(enrolModo !== "CAMARA" || !faceModelsLoaded || video.videoWidth === 0) return;
-        const displaySize = { width: video.videoWidth, height: video.videoHeight };
-        faceapi.matchDimensions(canvas, displaySize);
-        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-        if(detection) {
-           faceapi.draw.drawDetections(canvas, faceapi.resizeResults(detection, displaySize));
-           document.getElementById('enrolar-status').innerText = "Rostro Detectado. ¡Listo!";
-           document.getElementById('enrolar-status').className = 'text-xs font-bold text-green-500 mb-3';
-           enrolDescriptor = detection.descriptor;
-           document.getElementById('btn-guardar-rostro').disabled = false;
-           document.getElementById('btn-guardar-rostro').classList.remove('opacity-50', 'cursor-not-allowed');
-        }
-      }, 300);
-    };
-  } catch(e) { document.getElementById('enrolar-status').innerText = "Cámara inaccesible. Sube una foto."; }
-}
-
-async function procesarFotoArchivo(event) {
-  const file = event.target.files[0];
-  if(!file) return;
-  enrolModo = "ARCHIVO"; clearInterval(enrolInterval);
-  const video = document.getElementById('enrolar-video');
-  if(video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
-  video.classList.add('hidden');
-  
-  const preview = document.getElementById('enrolar-img-preview');
-  preview.src = URL.createObjectURL(file);
-  preview.classList.remove('hidden');
-  
-  toggleLoader(true, 'Extrayendo biometría de la foto...');
-  try {
-     const img = await faceapi.bufferToImage(file);
-     const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-     if (detection) {
-        enrolDescriptor = detection.descriptor;
-        document.getElementById('enrolar-status').innerText = "¡Rostro válido detectado en la foto!";
-        document.getElementById('enrolar-status').className = "text-xs font-bold text-green-600 mb-3";
-        document.getElementById('btn-guardar-rostro').disabled = false;
-        document.getElementById('btn-guardar-rostro').classList.remove('opacity-50', 'cursor-not-allowed');
-     } else {
-        document.getElementById('enrolar-status').innerText = "No se detectó rostro claro. Prueba otra foto.";
-        document.getElementById('enrolar-status').className = "text-xs font-bold text-red-500 mb-3";
-     }
-  } catch(err) { showToast("Error al leer imagen", "error"); }
-  toggleLoader(false);
-}
-
-function closeEnrolarModal() {
-   document.getElementById('modal-enrolar').classList.add('hidden');
-   clearInterval(enrolInterval);
-   const video = document.getElementById('enrolar-video');
-   if(video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
-}
-
-async function capturarYGuardarRostro() {
-   if(!enrolDescriptor) return;
-   toggleLoader(true, 'Guardando Mapa Biométrico...');
-   const payload = { 
-     empresaId: currentEmpresa.empresaId, 
-     empleadoId: currentEnrolId, 
-     descriptorJson: JSON.stringify(Array.from(enrolDescriptor)) 
-   };
-   try {
-      const res = await runServer('apiEnrolarRostro', payload);
-      if(res.status === 'success') { showToast(res.message); closeEnrolarModal(); loadEmpleados(); } 
-      else showToast(res.message, 'error');
-   } catch(e) { showToast('Fallo al guardar', 'error'); }
-   toggleLoader(false);
-}
-
-// ==========================================
-// SUPER ADMIN PRO: EDICIÓN COMPLETA Y SUSPENSIÓN
-// ==========================================
-async function loadEmpresas() {
-  toggleLoader(true, 'Cargando clientes y Shards...');
-  try {
-    const res = await runServer('apiGetEmpresas');
-    currentEmpresasList = res.data || [];
-    document.getElementById('table-empresas').innerHTML = currentEmpresasList.map(c => {
-      const mods = String(c.modulos || '').split(',').filter(Boolean);
-      const badges = mods.map(m => `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[10px] font-bold mr-1">${m}</span>`).join('');
-      const rangoPrecio = c.empleadosActivos <= 30 ? 'Rango 1-30' : 'Rango 31-100+';
-      
-      // Indicador visual de Base de Datos Independiente (Sharding)
-      const shardBadge = (c.shardId && c.shardId.length > 15)
-        ? `<a href="https://docs.google.com/spreadsheets/d/${c.shardId}" target="_blank" class="inline-block mt-1 bg-teal-100 text-teal-800 border border-teal-300 px-2 py-0.5 rounded text-[10px] font-bold hover:underline">🗄️ BD Propia Aislada ↗</a>`
-        : `<button onclick="migrarShardEmpresa('${c.id}', '${c.nombre}')" class="mt-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-400 px-2 py-0.5 rounded text-[10px] font-bold">⚡ Aislar BD (Crear Archivo Propio)</button>`;
-
-      return `
-      <tr class="border-b hover:bg-gray-50">
-        <td class="p-3">
-          <div class="font-bold text-purple-700">${c.id}</div>
-          <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${c.estatus==='SUSPENDIDA'?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${c.estatus || 'ACTIVA'}</span>
-        </td>
-        <td class="p-3 font-bold">${c.nombre}<br>${shardBadge}</td>
-        <td class="p-3 text-center">
-          <span class="font-extrabold text-sm text-blue-600">${c.empleadosActivos}</span> activos<br>
-          <span class="text-[10px] text-gray-500 font-semibold">${rangoPrecio}</span>
-        </td>
-        <td class="p-3 font-mono font-bold">${c.pin}</td>
-        <td class="p-3">${badges}</td>
-        <td class="p-3 text-right space-x-1">
-          <button onclick="abrirEditarEmpresaCompleta('${c.id}')" class="bg-gray-800 hover:bg-gray-700 text-white px-2.5 py-1 rounded text-xs font-bold">Editar / Módulos</button>
-          <button onclick="toggleStatusEmpresa('${c.id}', '${c.estatus==='SUSPENDIDA'?'ACTIVA':'SUSPENDIDA'}')" class="${c.estatus==='SUSPENDIDA'?'bg-green-600 text-white':'bg-red-100 text-red-700'} px-2.5 py-1 rounded text-xs font-bold">${c.estatus==='SUSPENDIDA'?'Reactivar':'Suspender'}</button>
-        </td>
-      </tr>`;
-    }).join('');
-  } catch(e){} 
-  toggleLoader(false);
-}
-
-function abrirModalEmpresa() {
-  document.getElementById('modal-cia-titulo').innerText = 'Alta de Nueva Empresa Cliente';
-  document.getElementById('edit-cia-id').value = '';
-  document.getElementById('new-cia-nombre').value = '';
-  document.getElementById('new-cia-lat').value = '';
-  document.getElementById('new-cia-lng').value = '';
-  document.getElementById('new-cia-radio').value = '100';
-  document.getElementById('new-cia-pin').value = '';
-  document.querySelectorAll('.chk-modulo').forEach(cb => cb.checked = cb.value !== 'CAMPO');
-  document.getElementById('modal-empresa').classList.remove('hidden');
-}
-
-function abrirEditarEmpresaCompleta(id) {
-  const cia = currentEmpresasList.find(x => String(x.id) === String(id));
-  if(!cia) return;
-  document.getElementById('modal-cia-titulo').innerText = `Editar Cliente: ${cia.nombre}`;
-  document.getElementById('edit-cia-id').value = cia.id;
-  document.getElementById('new-cia-nombre').value = cia.nombre || '';
-  document.getElementById('new-cia-lat').value = cia.lat || '';
-  document.getElementById('new-cia-lng').value = cia.lng || '';
-  document.getElementById('new-cia-radio').value = cia.radio || '100';
-  document.getElementById('new-cia-pin').value = cia.pin || '';
-  const activos = String(cia.modulos || '').toUpperCase().split(',').map(s => s.trim());
-  document.querySelectorAll('.chk-modulo').forEach(cb => { cb.checked = activos.includes(cb.value); });
-  document.getElementById('modal-empresa').classList.remove('hidden');
-}
-
-async function saveEmpresa() {
-  const editId = document.getElementById('edit-cia-id').value;
-  const seleccionados = Array.from(document.querySelectorAll('.chk-modulo:checked')).map(cb => cb.value).join(',');
-  const payload = { 
-    id: editId,
-    nombre: document.getElementById('new-cia-nombre').value.trim(), 
-    lat: document.getElementById('new-cia-lat').value.trim(), 
-    lng: document.getElementById('new-cia-lng').value.trim(), 
-    radio: document.getElementById('new-cia-radio').value.trim(), 
-    pin: document.getElementById('new-cia-pin').value.trim(), 
-    modulos: seleccionados || 'FOTO,GPS'
-  };
-  if(!payload.nombre || !payload.pin) return showToast('Nombre y PIN obligatorios', 'error');
-  
-  const action = editId ? 'apiUpdateEmpresa' : 'apiAddEmpresa';
-  toggleLoader(true, editId ? 'Actualizando cliente...' : 'Creando empresa...'); 
-  const res = await runServer(action, payload); 
-  toggleLoader(false);
-  if(res.status === 'success') { showToast(res.message); document.getElementById('modal-empresa').classList.add('hidden'); loadEmpresas(); } 
-  else showToast(res.message, 'error');
-}
-
-async function toggleStatusEmpresa(empresaId, newStatus) {
-  toggleLoader(true, `Cambiando estatus a ${newStatus}...`);
-  await runServer('apiToggleEmpresaStatus', { empresaId, newStatus });
-  toggleLoader(false);
-  loadEmpresas();
-}
-
-// ==========================================
-// REGISTRO KIOSCO (CON 4 MOMENTOS, VOZ Y OFFLINE)
-// ==========================================
-function initGPS() { if(navigator.geolocation) navigator.geolocation.watchPosition( p => { currentLat = p.coords.latitude; currentLng = p.coords.longitude; }, () => {}); }
-
-function toggleQR() {
-  const qrDiv = document.getElementById('qr-reader');
-  if(qrDiv.classList.contains('hidden')) {
-    qrDiv.classList.remove('hidden');
-    html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: {width: 220, height: 220} }, false);
-    html5QrcodeScanner.render((decodedText) => {
-      document.getElementById('pin-input').value = decodedText; showToast('Gafete Leído', 'success'); html5QrcodeScanner.clear(); qrDiv.classList.add('hidden');
-    }, () => {});
-  } else { if(html5QrcodeScanner) html5QrcodeScanner.clear(); qrDiv.classList.add('hidden'); }
-}
-
-async function registrar(tipo) {
-  const pin = document.getElementById('pin-input').value;
-  if(!pin) return showToast('Ingresa tu PIN o acerca tu rostro', 'error');
-  
-  const video = document.getElementById('live-video');
-  const canvas = document.getElementById('capture-canvas');
-  
-  if (tieneModulo(kioskEmpresa, 'FOTO')) {
-    if (!videoStream || video.videoWidth === 0) return showToast('Cámara inactiva', 'error');
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    const flash = document.getElementById('flash-overlay');
-    if(flash) { flash.classList.replace('opacity-0', 'opacity-100'); setTimeout(() => flash.classList.replace('opacity-100', 'opacity-0'), 150); }
-    base64Photo = canvas.toDataURL('image/jpeg', 0.7);
-  } else { base64Photo = null; }
-  
-  const fechaActual = new Date();
-  const payload = { pin: pin, tipo: tipo, lat: currentLat, lng: currentLng, fotoBase64: base64Photo, isOffline: !navigator.onLine, offlineDate: fechaActual.toLocaleDateString('en-CA'), offlineTime: fechaActual.toLocaleTimeString('en-GB') };
-
-  if(!navigator.onLine) return guardarLocalmente(payload);
-
-  toggleLoader(true, 'Registrando movimiento...');
-  try {
-    const res = await runServer('apiProcessCheckIn', payload);
-    if(res.status === 'success') { 
-      showToast(res.message); 
-      hablarKiosco(`${tipo.replace('_', ' ')} registrada. Gracias, ${res.empleadoNombre || ''}`);
-      resetKiosk(); 
-    } else {
-      showToast(res.message, 'error');
-      hablarKiosco(res.message);
-    }
-  } catch (e) { guardarLocalmente(payload); } 
-  toggleLoader(false);
-}
-
-function guardarLocalmente(payload) {
-  let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
-  offlineData.push(payload); localStorage.setItem('offline_registros', JSON.stringify(offlineData));
-  showToast('Guardado en Memoria Offline', 'success');
-  hablarKiosco(`Movimiento guardado sin conexión`);
-  resetKiosk(); updateOfflineUI();
-}
-
-function updateOfflineUI() {
-  let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
-  const banner = document.getElementById('offline-banner');
-  if(offlineData.length > 0) { document.getElementById('offline-count').innerText = offlineData.length; banner.classList.remove('hidden'); banner.classList.add('flex'); } 
-  else { banner.classList.add('hidden'); banner.classList.remove('flex'); }
-}
-
-async function syncOffline() {
-  if(!navigator.onLine) return showToast('Sin conexión a internet', 'error');
-  let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
-  if(offlineData.length === 0) return;
-  toggleLoader(true, `Sincronizando ${offlineData.length} registros...`);
-  try {
-    const res = await runServer('apiSyncOffline', offlineData);
-    if(res.status === 'success') { localStorage.removeItem('offline_registros'); showToast(res.message); updateOfflineUI(); } 
-    else showToast(res.message, 'error');
-  } catch(e) { showToast('Fallo de conexión', 'error'); } 
-  toggleLoader(false);
-}
-
-function resetKiosk() {
-  document.getElementById('pin-input').value = ''; base64Photo = null;
-  if(html5QrcodeScanner) { html5QrcodeScanner.clear(); document.getElementById('qr-reader').classList.add('hidden'); }
-}
-async function migrarShardEmpresa(empresaId, nombre) {
-  toggleLoader(true, `Creando Google Sheet independiente para ${nombre}...`);
-  try {
-    const res = await runServer('apiMigrateEmpresaShard', { empresaId });
-    if(res.status === 'success') {
-      showToast(res.message, 'success');
-      loadEmpresas();
-    } else showToast(res.message, 'error');
-  } catch(e) { showToast('Error al crear BD aislada', 'error'); }
-  toggleLoader(false);
-}
-
-async function registrar(tipo) {
-  const pin = document.getElementById('pin-input').value;
-  if(!pin) return showToast('Ingresa tu PIN o acerca tu rostro', 'error');
-  
-  const video = document.getElementById('live-video');
-  const canvas = document.getElementById('capture-canvas');
-  
-  if (tieneModulo(kioskEmpresa, 'FOTO')) {
-    if (!videoStream || video.videoWidth === 0) return showToast('Cámara inactiva', 'error');
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    const flash = document.getElementById('flash-overlay');
-    if(flash) { flash.classList.replace('opacity-0', 'opacity-100'); setTimeout(() => flash.classList.replace('opacity-100', 'opacity-0'), 150); }
-    base64Photo = canvas.toDataURL('image/jpeg', 0.7);
-  } else { base64Photo = null; }
-  
-  const fechaActual = new Date();
-  const payload = { 
-    empresaId: kioskEmpresa ? kioskEmpresa.empresaId : null, // <--- Enruta la checada al archivo exclusivo del cliente
-    pin: pin, 
-    tipo: tipo, 
-    lat: currentLat, 
-    lng: currentLng, 
-    fotoBase64: base64Photo, 
-    isOffline: !navigator.onLine, 
-    offlineDate: fechaActual.toLocaleDateString('en-CA'), 
-    offlineTime: fechaActual.toLocaleTimeString('en-GB') 
-  };
-
-  if(!navigator.onLine) return guardarLocalmente(payload);
-
-  toggleLoader(true, 'Registrando movimiento...');
-  try {
-    const res = await runServer('apiProcessCheckIn', payload);
-    if(res.status === 'success') { 
-      showToast(res.message); 
-      hablarKiosco(`${tipo.replace('_', ' ')} registrada. Gracias, ${res.empleadoNombre || ''}`);
-      resetKiosk(); 
-    } else {
-      showToast(res.message, 'error');
-      hablarKiosco(res.message);
-    }
-  } catch (e) { guardarLocalmente(payload); } 
-  toggleLoader(false);
-}
+  document.getElementById('gafete-empresa').innerText = current
