@@ -15,26 +15,31 @@ let currentReportData = [];
 let currentEmpleadosData = [];
 let currentEmpresasList = [];
 let currentLat = null, currentLng = null, base64Photo = null;
-let html5QrcodeScanner = null, videoStream = null;
+let videoStream = null;
 let isSavingEmpleado = false;
 let selectedIncidenciaTarget = null;
 
-// Variables Biometría IA
+// Variables Biometría IA y Escáner QR en el mismo Visor Circular
 let faceModelsLoaded = false;
 let kioskEmpresa = JSON.parse(localStorage.getItem('kiosco_empresa') || 'null');
+let empleadosPinMap = JSON.parse(localStorage.getItem('kiosco_pin_map') || '{}');
 let labeledFaceDescriptors = [];
 let faceMatcher = null;
 let faceDetectionInterval = null;
+let qrScanInterval = null;
+let isQrModeActive = false;
 let enrolDescriptor = null;
 let enrolInterval = null;
 let currentEnrolId = null;
 let enrolModo = "CAMARA";
 
+// Reloj en vivo para el Kiosco
 setInterval(() => {
   const clk = document.getElementById('live-clock');
   if(clk) clk.innerText = new Date().toLocaleTimeString('es-MX', { hour12: false });
 }, 1000);
 
+// Síntesis de Voz (Audio Feedback)
 function hablarKiosco(texto) {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -64,12 +69,17 @@ function mostrarSaludoKiosco(nombreCompleto) {
   const card = document.getElementById('kiosk-greeting-card');
   const nameEl = document.getElementById('kiosk-greeting-name');
   const avatarEl = document.getElementById('kiosk-greeting-avatar');
+  const ring = document.getElementById('biometric-ring');
   
   if (card && nameEl) {
-    const primerNombre = String(nombreCompleto || 'COLABORADOR').trim().split(' ')[0].toUpperCase();
+    const primerNombre = String(nombreCompleto || 'VERIFICADO').trim().split(' ')[0].toUpperCase();
     nameEl.innerText = `¡HOLA, ${primerNombre}!`;
     if (avatarEl) avatarEl.innerText = primerNombre.charAt(0) || '✓';
     card.classList.remove('hidden');
+  }
+  if (ring) {
+    ring.classList.remove('border-amber-400', 'border-emerald-400/70');
+    ring.classList.add('border-emerald-400');
   }
 }
 
@@ -162,7 +172,7 @@ function showToast(m, t='success') {
 }
 
 // ==========================================
-// CÁMARA KIOSCO E IA BIOMÉTRICA
+// CÁMARA CIRCULAR KIOSCO (IA FACIAL + LECTOR QR EN EL MISMO VISOR)
 // ==========================================
 async function startCamera() {
   const video = document.getElementById('live-video');
@@ -174,7 +184,9 @@ async function startCamera() {
     
     video.onplay = () => {
       faceDetectionInterval = setInterval(async () => {
-        if(!faceModelsLoaded || video.videoWidth === 0 || !tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) return;
+        // Si está activo el Modo QR en el círculo, pausamos la IA facial para no competir por CPU
+        if(isQrModeActive || !faceModelsLoaded || video.videoWidth === 0 || !tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) return;
+        
         const displaySize = { width: video.videoWidth, height: video.videoHeight };
         faceapi.matchDimensions(canvas, displaySize);
         
@@ -203,6 +215,7 @@ async function startCamera() {
 }
 
 function stopCamera() {
+  detenerEscaneoQR();
   if(faceDetectionInterval) clearInterval(faceDetectionInterval);
   if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
 }
@@ -211,23 +224,30 @@ async function initKioskAI() {
   const statusEl = document.getElementById('kiosk-ai-status');
   if(!kioskEmpresa) return;
   if(!tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
-    if(statusEl) statusEl.innerText = "Usa tu Gafete QR o PIN para registrar";
+    if(statusEl) statusEl.innerText = "Toca Gafete QR o Usar PIN para registrar";
     return;
   }
   if(!navigator.onLine) {
-    if(statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu PIN o QR)"; statusEl.className = "text-xs text-amber-400 font-semibold mb-3"; }
+    if(statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu Gafete QR o PIN)"; statusEl.className = "text-xs text-amber-400 font-semibold mb-3"; }
     return;
   }
 
   try {
      const res = await runServer('apiGetEmpleados', kioskEmpresa.empresaId);
      labeledFaceDescriptors = [];
+     empleadosPinMap = {};
      for(let e of res.data) {
-        if(e.mapaFacial && e.estatus === 'ACTIVO') {
-           const arr = new Float32Array(JSON.parse(e.mapaFacial));
-           labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(`${e.pin}|${e.nombre}`, [arr])); 
+        if(e.estatus === 'ACTIVO') {
+           empleadosPinMap[String(e.pin).trim()] = e.nombre;
+           if(e.mapaFacial) {
+              const arr = new Float32Array(JSON.parse(e.mapaFacial));
+              labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(`${e.pin}|${e.nombre}`, [arr])); 
+           }
         }
      }
+     // Guardamos el mapa de PIN -> Nombre localmente para que el lector QR salude por nombre incluso Offline
+     localStorage.setItem('kiosco_pin_map', JSON.stringify(empleadosPinMap));
+
      if(labeledFaceDescriptors.length > 0) {
         faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55);
         if(statusEl) { statusEl.innerText = `Acerca tu rostro dentro del círculo (${labeledFaceDescriptors.length} activos)`; statusEl.className = 'text-xs text-emerald-400 font-semibold mb-3'; }
@@ -235,6 +255,93 @@ async function initKioskAI() {
         if(statusEl) { statusEl.innerText = "IA Lista (Enrola rostros en el panel RH)"; }
      }
   } catch(e) {}
+}
+
+// Transición sin conflicto: Convierte el mismo círculo de video en un lector QR de alta velocidad
+function toggleQR() {
+  const ring = document.getElementById('biometric-ring');
+  const statusEl = document.getElementById('kiosk-ai-status');
+  const btnQr = document.getElementById('btn-kiosk-qr');
+  const video = document.getElementById('live-video');
+
+  if (isQrModeActive) {
+    detenerEscaneoQR();
+    if (statusEl) {
+      statusEl.innerText = "Acerca tu rostro dentro del círculo";
+      statusEl.className = "text-xs text-emerald-400 font-semibold mb-3";
+    }
+    return;
+  }
+
+  isQrModeActive = true;
+  // Quitamos el efecto espejo temporalmente para facilitar al usuario alinear el QR
+  if (video) video.classList.remove('scale-x-[-1]');
+  if (ring) {
+    ring.classList.remove('border-emerald-400/70', 'border-emerald-400');
+    ring.classList.add('border-amber-400');
+  }
+  if (statusEl) {
+    statusEl.innerText = "📷 Modo QR Activo: Acerca tu gafete al círculo";
+    statusEl.className = "text-xs text-amber-400 font-bold mb-3 animate-pulse";
+  }
+  if (btnQr) {
+    btnQr.classList.add('bg-amber-500', 'text-slate-950');
+    btnQr.classList.remove('bg-slate-800', 'text-slate-200');
+  }
+
+  const qrCanvas = document.createElement('canvas');
+  const qrCtx = qrCanvas.getContext('2d');
+
+  qrScanInterval = setInterval(() => {
+    if (!isQrModeActive || !video || video.videoWidth === 0) return;
+
+    qrCanvas.width = video.videoWidth;
+    qrCanvas.height = video.videoHeight;
+    qrCtx.drawImage(video, 0, 0, qrCanvas.width, qrCanvas.height);
+
+    const imageData = qrCtx.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+    if (typeof jsQR === 'function') {
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert"
+      });
+
+      if (code && code.data) {
+        const pinLeido = String(code.data).trim();
+        document.getElementById('pin-input').value = pinLeido;
+
+        const nombreConocido = empleadosPinMap[pinLeido] || 'GAFETE VERIFICADO';
+        mostrarSaludoKiosco(nombreConocido);
+        showToast('Gafete QR leído correctamente', 'success');
+        hablarKiosco(empleadosPinMap[pinLeido] ? `Hola ${nombreConocido.split(' ')[0]}` : 'Gafete verificado');
+
+        detenerEscaneoQR();
+        if (statusEl) {
+          statusEl.innerText = "Gafete verificado. Presiona Entrada o Salida.";
+          statusEl.className = "text-xs text-emerald-400 font-bold mb-3";
+        }
+      }
+    }
+  }, 150);
+}
+
+function detenerEscaneoQR() {
+  isQrModeActive = false;
+  if (qrScanInterval) {
+    clearInterval(qrScanInterval);
+    qrScanInterval = null;
+  }
+  const video = document.getElementById('live-video');
+  const ring = document.getElementById('biometric-ring');
+  const btnQr = document.getElementById('btn-kiosk-qr');
+  if (video) video.classList.add('scale-x-[-1]');
+  if (ring) {
+    ring.classList.remove('border-amber-400');
+    ring.classList.add('border-emerald-400/70');
+  }
+  if (btnQr) {
+    btnQr.classList.remove('bg-amber-500', 'text-slate-950');
+    btnQr.classList.add('bg-slate-800', 'text-slate-200');
+  }
 }
 
 // ==========================================
@@ -481,6 +588,14 @@ async function loadEmpleados() {
   try {
     const res = await runServer('apiGetEmpleados', currentEmpresa.empresaId);
     currentEmpleadosData = res.data || [];
+    
+    // Actualizar mapa local de PIN -> Nombre para el Kiosco
+    empleadosPinMap = {};
+    currentEmpleadosData.forEach(e => {
+      if(e.estatus === 'ACTIVO') empleadosPinMap[String(e.pin).trim()] = e.nombre;
+    });
+    localStorage.setItem('kiosco_pin_map', JSON.stringify(empleadosPinMap));
+
     actualizarSelectoresSucursales(currentEmpleadosData);
     filterEmpleadosTable();
   } catch(e) {} 
@@ -902,27 +1017,12 @@ async function toggleStatusEmpresa(empresaId, newStatus) {
 // ==========================================
 function initGPS() { if(navigator.geolocation) navigator.geolocation.watchPosition( p => { currentLat = p.coords.latitude; currentLng = p.coords.longitude; }, () => {}); }
 
-function toggleQR() {
-  const qrDiv = document.getElementById('qr-reader');
-  if(qrDiv.classList.contains('hidden')) {
-    qrDiv.classList.remove('hidden');
-    html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: {width: 220, height: 220} }, false);
-    html5QrcodeScanner.render((decodedText) => {
-      document.getElementById('pin-input').value = decodedText; 
-      mostrarSaludoKiosco('GAFETE VERIFICADO');
-      showToast('Gafete Leído', 'success'); 
-      html5QrcodeScanner.clear(); 
-      qrDiv.classList.add('hidden');
-    }, () => {});
-  } else { if(html5QrcodeScanner) html5QrcodeScanner.clear(); qrDiv.classList.add('hidden'); }
-}
-
 async function registrar(tipo) {
   const pin = document.getElementById('pin-input').value;
   if(!pin) {
     const manualBox = document.getElementById('pin-manual-box');
     if (manualBox) manualBox.classList.remove('hidden');
-    return showToast('Acerca tu rostro o ingresa tu PIN', 'error');
+    return showToast('Acerca tu rostro, escanea QR o ingresa tu PIN', 'error');
   }
   
   if (tieneModulo(kioskEmpresa, 'CAMPO') && (currentLat === null || currentLng === null)) {
@@ -977,9 +1077,12 @@ async function registrar(tipo) {
 function guardarLocalmente(payload) {
   let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
   offlineData.push(payload); localStorage.setItem('offline_registros', JSON.stringify(offlineData));
+  const nombreLocal = empleadosPinMap[String(payload.pin).trim()] || '';
+  if (nombreLocal) mostrarSaludoKiosco(nombreLocal);
   showToast('Guardado en Memoria Offline', 'success');
   hablarKiosco(`Movimiento guardado sin conexión`);
-  resetKiosk(); updateOfflineUI();
+  setTimeout(() => resetKiosk(), 1500);
+  updateOfflineUI();
 }
 
 function updateOfflineUI() {
@@ -1005,9 +1108,14 @@ async function syncOffline() {
 function resetKiosk() {
   document.getElementById('pin-input').value = ''; 
   base64Photo = null;
+  detenerEscaneoQR();
   const card = document.getElementById('kiosk-greeting-card');
   if(card) card.classList.add('hidden');
   const manualBox = document.getElementById('pin-manual-box');
   if(manualBox) manualBox.classList.add('hidden');
-  if(html5QrcodeScanner) { html5QrcodeScanner.clear(); document.getElementById('qr-reader').classList.add('hidden'); }
+  const statusEl = document.getElementById('kiosk-ai-status');
+  if(statusEl && tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
+    statusEl.innerText = "Acerca tu rostro dentro del círculo";
+    statusEl.className = "text-xs text-emerald-400 font-semibold mb-3";
+  }
 }
