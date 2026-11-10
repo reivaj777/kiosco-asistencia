@@ -78,10 +78,10 @@
       <button onclick="syncOffline()" class="bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-lg font-extrabold hover:bg-amber-400">Sincronizar</button>
     </div>
 
-    <!-- TARJETA FLOTANTE DE BIENVENIDA (Aparece al detectar rostro o QR) -->
+    <!-- TARJETA FLOTANTE "¡HOLA!" (Aparece al detectar rostro o QR) -->
     <div id="kiosk-greeting-card" class="hidden bg-white text-slate-900 px-4 py-2.5 rounded-2xl shadow-2xl mb-3 mx-auto max-w-xs border-2 border-emerald-400 transform transition-all duration-300">
-      <div class="flex items-center justify-center gap-2.5">
-        <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-extrabold text-base" id="kiosk-greeting-avatar">✓</div>
+      <div class="flex items-center justify-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-extrabold text-sm" id="kiosk-greeting-avatar">✓</div>
         <div class="text-left">
           <p class="font-black text-sm tracking-tight leading-none" id="kiosk-greeting-name">¡HOLA!</p>
           <p class="text-[11px] text-slate-500 font-medium mt-0.5">Qué bueno verte por aquí 👋</p>
@@ -90,9 +90,9 @@
     </div>
 
     <!-- VISOR BIOMÉTRICO CIRCULAR -->
-    <div class="relative w-52 h-52 mx-auto mb-3 flex items-center justify-center">
+    <div class="relative w-56 h-56 mx-auto mb-3 flex items-center justify-center">
       <div id="biometric-ring" class="absolute inset-0 rounded-full border-4 border-dashed border-emerald-400/70 animate-[spin_25s_linear_infinite] pointer-events-none z-20"></div>
-      <div class="relative w-44 h-44 rounded-full bg-black overflow-hidden border-4 border-slate-800 shadow-2xl flex items-center justify-center">
+      <div class="relative w-48 h-48 rounded-full bg-black overflow-hidden border-4 border-slate-800 shadow-2xl flex items-center justify-center">
         <video id="live-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover scale-x-[-1]"></video>
         <canvas id="face-canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none opacity-80"></canvas>
         <canvas id="capture-canvas" class="hidden"></canvas>
@@ -156,7 +156,7 @@
       <div class="flex gap-5 text-xs md:text-sm overflow-x-auto">
         <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina STPS 2027</button>
         <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Expedientes, RFC/CURP y Acuerdos</button>
-        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales / Obras GPS</button>
+        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales GPS</button>
       </div>
     </div>
     
@@ -235,7 +235,7 @@
     <div id="tab-empleados" class="flex-1 flex flex-col min-h-0 overflow-hidden hidden">
       <div class="p-3 bg-gray-50 border-b flex flex-wrap gap-2 justify-between items-center shrink-0 text-xs">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-gray-700">Sucursal / Obra:</span>
+          <span class="font-bold text-gray-700">Sucursal:</span>
           <select id="filter-sucursal-emp" onchange="filterEmpleadosTable()" class="border rounded px-2 py-1.5 bg-white font-semibold">
             <option value="TODAS">Todas</option>
           </select>
@@ -262,7 +262,7 @@
       </div>
     </div>
 
-    <!-- TAB 3: Configuración de Turnos y Geocercas por Sucursal / Obra -->
+    <!-- TAB 3: Configuración de Turnos y Geocercas por Sucursal -->
     <div id="tab-config" class="flex-1 min-h-0 scroll-area bg-gray-50 p-4 hidden">
       <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
         
@@ -270,7 +270,7 @@
           <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-blue-600"></i> Horarios y Turnos LFT</h3>
           <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
             <input type="text" id="cfg-turno-id" placeholder="Código (Ej. T1, T2)" class="border p-2 rounded font-bold uppercase">
-            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Obra Diurno)" class="border p-2 rounded">
+            <input type="text" id="cfg-turno-nombre" placeholder="Nombre (Ej. Diurno 46h)" class="border p-2 rounded">
           </div>
           <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
             <div><label class="text-[10px] font-bold text-gray-500">Entrada</label><input type="time" id="cfg-turno-ent" value="08:00" class="w-full border p-1.5 rounded"></div>
@@ -310,7 +310,7 @@
     </div>
   </div>
 
-  <!-- VISTA 5: Super Admin Pro (Marca Blanca + Sharding) -->
+  <!-- VISTA 5: Super Admin Pro (Marca Blanca) -->
   <div id="view-superadmin" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[92dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden border-t-8 border-purple-600">
     <div class="bg-gray-900 text-white px-5 py-3 flex justify-between items-center shrink-0">
       <div>
@@ -479,7 +479,7 @@
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="FOTO" checked><span><strong>Evidencia Fotográfica Anti-Fraude</strong></span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="GPS" checked><span><strong>Geocerca GPS Multi-Sucursal</strong></span></label>
         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="LFT_PRENOMINA" checked><span><strong>Motor Pre-Nómina LFT 2027, Comidas e Incidencias</strong></span></label>
-        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Constructoras / Trabajadores en Campo</strong></span></label>
+        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="chk-modulo w-4 h-4" value="CAMPO"><span><strong>Módulo Trabajadores en Campo / Obras</strong></span></label>
       </div>
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modal-empresa').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
