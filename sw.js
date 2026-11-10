@@ -1,14 +1,12 @@
-const CACHE_NAME = "kiosco-v4-lft2027";
+const CACHE_NAME = "kiosco-v6-clean";
 const ASSETS = [
   "./",
   "./index.html",
-  "./app.js",
+  "./app.js?v=2027",
   "./manifest.json",
-  // Inyectamos la librería de IA para que se guarde localmente
   "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js",
   "https://unpkg.com/lucide@latest",
   "https://unpkg.com/html5-qrcode",
-  // Cacheamos los pesos de la Red Neuronal (Vital para offline)
   "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/tiny_face_detector_model-weights_manifest.json",
   "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/tiny_face_detector_model-shard1",
   "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_landmark_68_model-weights_manifest.json",
@@ -20,37 +18,26 @@ const ASSETS = [
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k)))).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", (e) => {
-  // Ignorar peticiones de guardado del backend o de WhatsApp para no romper el caché
-  if (e.request.url.includes("script.google.com")) {
-    return fetch(e.request);
+  // Nunca interceptar peticiones POST ni llamadas hacia Google Apps Script
+  if (e.request.method !== "GET" || e.request.url.includes("script.google.com")) {
+    return;
   }
   
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       return cachedResponse || fetch(e.request).catch(() => {
-        // Fallback básico si todo falla offline
-        return new Response("Contenido no disponible offline", {
-          headers: { "Content-Type": "text/plain" }
-        });
+        return new Response("Modo Offline Activo", { headers: { "Content-Type": "text/plain" } });
       });
     })
   );
