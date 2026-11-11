@@ -56,19 +56,19 @@
     </button>
   </div>
 
-  <!-- VISTA 2: Login Administradores -->
+  <!-- VISTA 2: Login Administradores / Supervisores -->
   <div id="view-admin" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center hidden relative m-4">
     <button onclick="showView('view-menu')" class="absolute top-4 left-4 text-gray-500 hover:text-gray-800"><i data-lucide="arrow-left"></i></button>
-    <h2 class="text-xl font-bold mb-6 mt-4">Panel de Administración</h2>
-    <input type="password" id="admin-pin" placeholder="PIN Administrativo" class="w-full text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-lg mb-6 focus:border-blue-500 outline-none">
+    <h2 class="text-xl font-bold mb-2 mt-4">Panel de Administración</h2>
+    <p class="text-[11px] text-gray-500 mb-6">Acceso para Dirección RH, Contabilidad y Supervisores de Obra</p>
+    <input type="password" id="admin-pin" placeholder="PIN de Acceso" class="w-full text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-lg mb-6 focus:border-blue-500 outline-none" inputmode="numeric">
     <button onclick="loginAdmin()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-lg font-bold">Autenticar</button>
   </div>
 
-  <!-- VISTA 3: Kiosco Operativo (Estilo Premium Dark UI + Visor Circular Biométrico) -->
+  <!-- VISTA 3: Kiosco Operativo (Dark UI + Visor Circular Unificado IA/QR) -->
   <div id="view-kiosk" class="bg-slate-900 text-white p-6 rounded-3xl shadow-2xl w-full max-w-md text-center hidden relative m-4 max-h-[96dvh] overflow-y-auto border border-slate-700">
     <button onclick="showView('view-menu')" class="absolute top-5 left-5 text-slate-400 hover:text-white z-50 bg-slate-800 p-2 rounded-full"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
     
-    <!-- Encabezado y Reloj -->
     <p class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mt-1">Registro de Jornada</p>
     <p id="live-clock" class="text-3xl font-mono font-extrabold text-white tracking-tight mb-1">00:00:00</p>
     <p id="kiosk-sucursal-badge" class="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-700/60 inline-block px-3 py-0.5 rounded-full mb-3">📍 Sucursal Activa</p>
@@ -79,7 +79,7 @@
       <button onclick="syncOffline()" class="bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-lg font-extrabold hover:bg-amber-400">Sincronizar</button>
     </div>
 
-    <!-- TARJETA FLOTANTE "¡HOLA!" (Aparece al detectar rostro o QR) -->
+    <!-- TARJETA FLOTANTE DE SALUDO -->
     <div id="kiosk-greeting-card" class="hidden bg-white text-slate-900 px-4 py-2.5 rounded-2xl shadow-2xl mb-3 mx-auto max-w-xs border-2 border-emerald-400 transform transition-all duration-300">
       <div class="flex items-center justify-center gap-2">
         <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-extrabold text-sm" id="kiosk-greeting-avatar">✓</div>
@@ -103,10 +103,7 @@
     
     <p id="kiosk-ai-status" class="text-xs text-slate-300 font-semibold mb-3">Acerca tu rostro dentro del círculo</p>
 
-    <!-- Lector QR Oculto por defecto -->
-    <div id="qr-reader" class="w-full mb-3 hidden overflow-hidden rounded-xl border-2 border-blue-400 bg-slate-800 text-slate-900"></div>
-
-    <!-- Barra de métodos alternativos (QR / PIN Manual) -->
+    <!-- Métodos alternativos (QR en el mismo círculo / PIN Manual) -->
     <div class="flex justify-center gap-3 mb-3">
       <button id="btn-kiosk-qr" onclick="toggleQR()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5">
         <i data-lucide="qr-code" class="w-3.5 h-3.5 text-amber-400"></i> Gafete QR
@@ -116,12 +113,11 @@
       </button>
     </div>
 
-    <!-- Caja de PIN -->
     <div id="pin-manual-box" class="hidden mb-3">
       <input type="password" id="pin-input" placeholder="Ingresa tu PIN" class="w-full bg-slate-800 text-white text-center text-xl tracking-widest font-bold py-2 px-4 border border-slate-600 rounded-xl outline-none focus:border-blue-400" inputmode="numeric">
     </div>
     
-    <!-- Botones de Acción (4 Momentos LFT 2027) -->
+    <!-- Botones de los 4 Momentos LFT 2027 -->
     <div class="grid grid-cols-2 gap-2.5 mb-2">
       <button onclick="registrar('ENTRADA')" class="bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-extrabold shadow-lg flex items-center justify-center gap-1.5 text-sm transition"><i data-lucide="log-in" class="w-4 h-4"></i> Entrada</button>
       <button onclick="registrar('SALIDA')" class="bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl font-extrabold shadow-lg flex items-center justify-center gap-1.5 text-sm transition"><i data-lucide="log-out" class="w-4 h-4"></i> Salida</button>
@@ -131,16 +127,15 @@
       <button onclick="registrar('FIN_COMIDA')" class="bg-cyan-600 hover:bg-cyan-500 text-white py-2 rounded-xl font-extrabold shadow text-xs flex items-center justify-center gap-1 transition"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Regresar Comida</button>
     </div>
 
-    <!-- Píldoras de Ecosistema -->
     <div class="flex flex-wrap justify-center gap-1.5 pt-2 border-t border-slate-800 text-[10px] text-slate-400 font-semibold">
       <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span> GPS + Geocerca</span>
       <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Biometría IA</span>
       <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> QR</span>
-      <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Ley 40h / LFT</span>
+      <span class="bg-slate-800/90 px-2 py-0.5 rounded-md flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> LFT 2027</span>
     </div>
   </div>
 
-  <!-- VISTA 4: Dashboard RH -->
+  <!-- VISTA 4: Dashboard RH / Supervisores (Con 5 Pestañas Empresariales) -->
   <div id="view-dashboard" class="bg-white w-full h-[100dvh] md:max-w-6xl md:h-[94dvh] md:rounded-xl shadow-2xl hidden flex-col overflow-hidden">
     
     <!-- Barra Superior Fija -->
@@ -150,14 +145,21 @@
           <h2 id="empresa-name" class="font-bold text-base md:text-lg leading-tight">Módulo RH</h2>
           <p id="empresa-modulos-badges" class="text-[10px] text-gray-400"></p>
         </div>
-        <button onclick="logoutAdmin()" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded font-bold flex items-center gap-1">
-          <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
-        </button>
+        <div class="flex items-center gap-2">
+          <button id="btn-ver-audit" onclick="abrirAuditLog()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded font-bold flex items-center gap-1">
+            <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-emerald-400"></i> Auditoría SHA-256
+          </button>
+          <button onclick="logoutAdmin()" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded font-bold flex items-center gap-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
+          </button>
+        </div>
       </div>
       <div class="flex gap-5 text-xs md:text-sm overflow-x-auto">
         <button id="tab-btn-prenomina" onclick="switchRHTab('prenomina')" class="pb-1.5 font-bold border-b-4 border-blue-400 text-white whitespace-nowrap">Pre-Nómina STPS 2027</button>
-        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Expedientes, RFC/CURP y Acuerdos</button>
-        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos y Sucursales GPS</button>
+        <button id="tab-btn-empleados" onclick="switchRHTab('empleados')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Expedientes y Acuerdos</button>
+        <button id="tab-btn-usuarios" onclick="switchRHTab('usuarios')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Supervisores y Permisos</button>
+        <button id="tab-btn-layouts" onclick="switchRHTab('layouts')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Layouts Nómina</button>
+        <button id="tab-btn-config" onclick="switchRHTab('config')" class="pb-1.5 font-bold border-b-4 border-transparent text-gray-400 hover:text-white whitespace-nowrap">Turnos, Geocercas y Ley</button>
       </div>
     </div>
     
@@ -198,14 +200,16 @@
             <option value="TODAS">Todas</option>
           </select>
         </div>
-        <div class="flex gap-1.5">
+        <div class="flex flex-wrap gap-1.5">
           <button onclick="loadReports()" class="bg-blue-600 text-white px-3 py-1 rounded font-bold hover:bg-blue-700">Consultar</button>
-          <button id="btn-export" onclick="exportToCSV()" class="bg-green-600 text-white px-3 py-1 rounded font-bold hover:bg-green-700 hidden">CSV CONTPAQi / STPS</button>
+          <button id="btn-export" onclick="exportToCSV()" class="bg-emerald-600 text-white px-2.5 py-1 rounded font-bold hover:bg-emerald-700 hidden">CSV Completo</button>
+          <button id="btn-export-nomina" onclick="exportarLayoutNomina('CONTPAQI')" class="bg-indigo-600 text-white px-2.5 py-1 rounded font-bold hover:bg-indigo-700">CONTPAQi</button>
+          <button id="btn-export-aspel" onclick="exportarLayoutNomina('ASPEL')" class="bg-purple-600 text-white px-2.5 py-1 rounded font-bold hover:bg-purple-700">Aspel NOI</button>
         </div>
-        <div class="ml-auto w-full md:w-56">
+        <div class="ml-auto w-full md:w-52">
           <div class="relative">
             <i data-lucide="search" class="absolute left-2 top-1.5 w-3.5 h-3.5 text-gray-400"></i>
-            <input type="text" id="search-report" oninput="filterReport()" placeholder="Buscar nombre, RFC, CURP o PIN..." class="border rounded pl-7 pr-2 py-1 w-full bg-white outline-none focus:ring-1 focus:ring-blue-400">
+            <input type="text" id="search-report" oninput="filterReport()" placeholder="Buscar nombre, RFC, PIN..." class="border rounded pl-7 pr-2 py-1 w-full bg-white outline-none focus:ring-1 focus:ring-blue-400">
           </div>
         </div>
       </div>
@@ -242,7 +246,7 @@
           </select>
           <input type="text" id="search-emp-catalog" oninput="filterEmpleadosTable()" placeholder="Filtrar por nombre, RFC o CURP..." class="border rounded px-2.5 py-1.5 bg-white w-48 md:w-64 outline-none">
         </div>
-        <button onclick="abrirModalNuevoEmpleado()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Colaborador</button>
+        <button id="btn-nuevo-emp" onclick="abrirModalNuevoEmpleado()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Colaborador</button>
       </div>
       
       <div class="flex-1 min-h-0 scroll-area bg-white relative">
@@ -263,9 +267,47 @@
       </div>
     </div>
 
-    <!-- TAB 3: Configuración de Turnos y Geocercas por Sucursal -->
+    <!-- TAB 3: Supervisores de Obra y Permisos Granulares -->
+    <div id="tab-usuarios" class="flex-1 flex flex-col min-h-0 overflow-hidden hidden">
+      <div class="p-3 bg-gray-50 border-b flex justify-between items-center shrink-0 text-xs">
+        <div>
+          <h3 class="font-bold text-sm text-gray-800">Supervisores de Obra y Administradores</h3>
+          <p class="text-[11px] text-gray-500">Crea accesos restringidos para residentes de obra o encargados de sucursal.</p>
+        </div>
+        <button onclick="abrirModalNuevoUsuario()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Supervisor</button>
+      </div>
+      <div class="flex-1 min-h-0 scroll-area bg-white relative">
+        <table class="w-full text-left border-collapse whitespace-nowrap text-xs">
+          <thead class="sticky top-0 z-20 bg-gray-200 shadow-sm">
+            <tr>
+              <th class="p-3">Usuario / Estatus</th>
+              <th class="p-3">Rol</th>
+              <th class="p-3">Permisos Asignados</th>
+              <th class="p-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="table-usuarios"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: Constructor Visual de Layouts de Nómina -->
+    <div id="tab-layouts" class="flex-1 min-h-0 scroll-area bg-gray-50 p-4 hidden">
+      <div class="max-w-5xl mx-auto">
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+          <div>
+            <h3 class="font-bold text-base text-gray-800">Layouts de Exportación para Sistemas de Nómina</h3>
+            <p class="text-xs text-gray-500">Configura el orden y mapeo de columnas para CONTPAQi, Aspel NOI o cualquier ERP contable.</p>
+          </div>
+          <button onclick="abrirModalLayoutNuevo()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700">+ Nuevo Layout Personalizado</button>
+        </div>
+        <div id="grid-layouts" class="grid md:grid-cols-2 gap-4"></div>
+      </div>
+    </div>
+
+    <!-- TAB 5: Configuración de Turnos, Geocercas por Sucursal y Ley 2026-2030 -->
     <div id="tab-config" class="flex-1 min-h-0 scroll-area bg-gray-50 p-4 hidden">
-      <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+      <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto mb-6">
         
         <div class="bg-white p-4 rounded-xl shadow border">
           <h3 class="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-blue-600"></i> Horarios y Turnos LFT</h3>
@@ -308,6 +350,23 @@
         </div>
 
       </div>
+
+      <!-- Configuración Legal Multianual (Reducción Gradual 48h -> 40h) -->
+      <div class="bg-white p-4 rounded-xl shadow border max-w-5xl mx-auto">
+        <h3 class="font-bold text-sm text-gray-800 mb-2 flex items-center gap-2"><i data-lucide="scale" class="w-4 h-4 text-purple-600"></i> Parámetros Legales por Año (Transición LFT 48h a 40h)</h3>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3 text-xs">
+          <div><label class="text-[10px] font-bold text-gray-500">Año</label><input type="number" id="cfg-legal-anio" value="2027" class="w-full border p-1.5 rounded font-bold"></div>
+          <div><label class="text-[10px] font-bold text-gray-500">Hrs/Sem Máx</label><input type="number" id="cfg-legal-horas" value="46" class="w-full border p-1.5 rounded"></div>
+          <div><label class="text-[10px] font-bold text-gray-500">Dobles Máx/Día</label><input type="number" id="cfg-legal-dobles" value="3" class="w-full border p-1.5 rounded"></div>
+          <div><label class="text-[10px] font-bold text-gray-500">Tope Sem Dobles</label><input type="number" id="cfg-legal-triple" value="9" class="w-full border p-1.5 rounded"></div>
+          <div><label class="text-[10px] font-bold text-gray-500">Notas</label><input type="text" id="cfg-legal-notas" placeholder="Reforma LFT" class="w-full border p-1.5 rounded"></div>
+        </div>
+        <button onclick="guardarConfigLegal()" class="bg-purple-600 text-white px-4 py-1.5 rounded font-bold text-xs hover:bg-purple-700 mb-3">Guardar Parámetro Anual</button>
+        <table class="w-full text-xs border-collapse">
+          <thead><tr class="bg-gray-100"><th class="p-2">Año</th><th class="p-2">Jornada Semanal</th><th class="p-2">Tope Dobles/Día</th><th class="p-2">Tope Dobles/Sem</th><th class="p-2">Notas</th></tr></thead>
+          <tbody id="table-config-legal"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -316,9 +375,12 @@
     <div class="bg-gray-900 text-white px-5 py-3 flex justify-between items-center shrink-0">
       <div>
         <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-yellow-400"></i>Panel Maestro SaaS</h2>
-        <p class="text-[11px] text-gray-400">Control de Suscripciones, Bases de Datos Aisladas (Sharding) y Módulos</p>
+        <p class="text-[11px] text-gray-400">Control de Suscripciones, Bases de Datos Aisladas (Sharding), Hardware y Módulos</p>
       </div>
-      <button onclick="logoutAdmin()" class="text-xs bg-red-600 px-3 py-1.5 rounded font-bold">Salir</button>
+      <div class="flex items-center gap-2">
+        <button onclick="abrirAuditLog()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded font-bold">Auditoría Global</button>
+        <button onclick="logoutAdmin()" class="text-xs bg-red-600 px-3 py-1.5 rounded font-bold">Salir</button>
+      </div>
     </div>
     <div class="p-3 bg-gray-50 border-b flex justify-between items-center shrink-0">
       <h3 class="font-bold text-sm text-gray-700">Empresas Clientes Activas</h3>
@@ -331,7 +393,6 @@
             <th class="p-3">ID / Estatus</th>
             <th class="p-3">Razón Social / Base de Datos</th>
             <th class="p-3 text-center">Plantilla Activa</th>
-            <th class="p-3">PIN RH</th>
             <th class="p-3">Módulos Habilitados</th>
             <th class="p-3 text-right">Acciones SaaS</th>
           </tr>
@@ -385,6 +446,44 @@
     </div>
   </div>
 
+  <!-- MODAL: ALTA Y EDICIÓN DE SUPERVISORES CON PERMISOS GRANULARES -->
+  <div id="modal-usuario" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[92dvh] overflow-y-auto">
+      <h3 id="modal-usr-titulo" class="font-bold text-lg mb-3 text-gray-800">Alta de Supervisor</h3>
+      <input type="hidden" id="usr-edit-id">
+      <label class="text-xs font-bold text-gray-600">Nombre del Supervisor / Usuario *</label>
+      <input type="text" id="new-usr-nombre" placeholder="Ej. Ing. Residente Obra Norte" class="w-full border p-2 mb-2 rounded text-sm mt-0.5">
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <div>
+          <label class="text-xs font-bold text-gray-600">PIN de Acceso *</label>
+          <input type="number" id="new-usr-pin" placeholder="Ej. 4580" class="w-full border p-2 rounded text-sm font-bold mt-0.5">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-gray-600">Rol</label>
+          <select id="usr-rol" class="w-full border p-2 rounded text-sm bg-white mt-0.5">
+            <option value="SUPERVISOR">SUPERVISOR (Operativo)</option>
+            <option value="ADMIN">ADMIN (RH Completo)</option>
+          </select>
+        </div>
+      </div>
+      <p class="text-xs font-bold text-gray-600 uppercase mb-2">Permisos Granulares Autorizados:</p>
+      <div class="space-y-1.5 bg-gray-50 p-3 rounded-lg border mb-4 text-xs">
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="ver_reportes" checked><span>Ver reportes de pre-nómina y asistencia</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="justificar_incidencias" checked><span>Justificar faltas e incidencias (IMSS, Permisos)</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="gestionar_empleados"><span>Dar de alta y editar expedientes de empleados</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="enrolar_rostros"><span>Enrolar rostros biométricos</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="gestionar_turnos"><span>Gestionar horarios y turnos</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="gestionar_sucursales"><span>Configurar sucursales y geocercas GPS</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="exportar_nomina"><span>Exportar CSV y layouts de nómina</span></label>
+        <label class="flex items-center gap-2"><input type="checkbox" class="chk-perm-usr w-4 h-4" value="ver_audit_log"><span>Consultar bitácora de auditoría SHA-256</span></label>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modal-usuario').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button onclick="saveUsuario()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar Usuario</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: CARTA ACUERDO DE PRUEBA PLENA LFT 2027 (MARCA BLANCA) -->
   <div id="modal-acuerdo-lft" class="fixed inset-0 bg-black/75 z-50 hidden flex justify-center items-center p-4">
     <div class="bg-white p-6 rounded-xl w-full max-w-xl shadow-2xl max-h-[92dvh] overflow-y-auto">
@@ -416,6 +515,124 @@
       <div class="flex justify-end gap-2 mt-4 no-print">
         <button onclick="cerrarModalImpresion('modal-acuerdo-lft', 'acuerdo-print-area')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cerrar</button>
         <button onclick="imprimirElemento('acuerdo-print-area')" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs flex items-center gap-1"><i data-lucide="printer" class="w-4 h-4"></i> Imprimir Acuerdo Legal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AVISO DE PRIVACIDAD Y CONSENTIMIENTO DIGITAL EN KIOSCO -->
+  <div id="modal-consent" class="fixed inset-0 bg-black/80 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[90dvh] flex flex-col">
+      <h3 class="font-bold text-base mb-1 text-gray-900">Aviso de Privacidad y Acuerdo LFT</h3>
+      <p id="consent-empleado" class="text-xs text-blue-600 font-bold mb-2"></p>
+      <div id="consent-texto" class="flex-1 overflow-y-auto bg-gray-50 p-3 rounded border text-[11px] text-gray-700 whitespace-pre-line mb-3"></div>
+      <div class="flex justify-end gap-2">
+        <button onclick="rechazarConsentimiento()" class="px-3 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button onclick="aceptarConsentimiento()" class="px-4 py-2 bg-emerald-600 text-white rounded font-bold text-xs">Acepto y Registrar Asistencia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: BITÁCORA DE AUDITORÍA INMUTABLE SHA-256 -->
+  <div id="modal-audit" class="fixed inset-0 bg-black/75 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-4xl shadow-2xl max-h-[90dvh] flex flex-col">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <h3 class="font-bold text-base text-gray-900 flex items-center gap-2"><i data-lucide="shield-check" class="w-5 h-5 text-emerald-600"></i> Bitácora de Auditoría Inmutable (Cadena SHA-256)</h3>
+          <p class="text-xs text-gray-500">Cada registro está encadenado criptográficamente al anterior para garantizar cero alteración ante la STPS.</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="verificarIntegridadAudit()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold text-xs">Verificar Integridad</button>
+          <button onclick="document.getElementById('modal-audit').classList.add('hidden')" class="bg-gray-200 px-3 py-1.5 rounded font-bold text-xs">Cerrar</button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto border rounded">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-gray-100 sticky top-0">
+            <tr>
+              <th class="p-2">Fecha / Hora</th>
+              <th class="p-2">Acción</th>
+              <th class="p-2">Usuario</th>
+              <th class="p-2">Detalles</th>
+              <th class="p-2">Sello SHA-256</th>
+            </tr>
+          </thead>
+          <tbody id="table-audit"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURADOR DE LAYOUT DE NÓMINA -->
+  <div id="modal-layout" class="fixed inset-0 bg-black/70 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-2xl shadow-2xl max-h-[92dvh] flex flex-col">
+      <div class="flex justify-between items-center mb-3">
+        <h3 id="layout-modal-titulo" class="font-bold text-base text-gray-900">Configurar Layout de Nómina</h3>
+        <button onclick="verificarLayoutActual()" class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded font-bold">Verificar Columnas</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+        <div>
+          <label class="font-bold text-gray-600">Nombre del Sistema / ERP *</label>
+          <input type="text" id="layout-sistema" placeholder="Ej. CONTPAQI, ASPEL, WORKY" class="w-full border p-2 rounded font-bold uppercase mt-0.5">
+        </div>
+        <div>
+          <label class="font-bold text-gray-600">Descripción</label>
+          <input type="text" id="layout-descripcion" placeholder="Opcional" class="w-full border p-2 rounded mt-0.5">
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto border rounded mb-3">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-gray-100 sticky top-0">
+            <tr>
+              <th class="p-2 w-10">#</th>
+              <th class="p-2">Nombre de Columna en CSV</th>
+              <th class="p-2">Dato de Origen</th>
+              <th class="p-2">Valor Fijo (Opcional)</th>
+              <th class="p-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="table-mapeo-body"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-between items-center">
+        <button onclick="agregarFilaMapeo({})" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded font-bold text-xs">+ Agregar Columna</button>
+        <div class="flex gap-2">
+          <button onclick="document.getElementById('modal-layout').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+          <button onclick="guardarLayoutActual()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Guardar Layout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPORTAR LAYOUT PERSONALIZADO POR FECHAS -->
+  <div id="modal-export-layout" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-sm shadow-2xl">
+      <h3 class="font-bold text-base mb-1">Exportar Layout de Nómina</h3>
+      <p id="export-layout-sistema" class="text-xs text-blue-600 font-bold mb-3"></p>
+      <div class="grid grid-cols-2 gap-2 mb-4 text-xs">
+        <div><label class="font-bold text-gray-600">Fecha Inicio</label><input type="date" id="export-layout-inicio" class="w-full border p-2 rounded mt-0.5"></div>
+        <div><label class="font-bold text-gray-600">Fecha Fin</label><input type="date" id="export-layout-fin" class="w-full border p-2 rounded mt-0.5"></div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modal-export-layout').classList.add('hidden')" class="px-3 py-2 bg-gray-200 rounded font-bold text-xs">Cancelar</button>
+        <button onclick="ejecutarExportLayout()" class="px-4 py-2 bg-emerald-600 text-white rounded font-bold text-xs">Descargar CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PROBAR LAYOUT CON DATOS DE MUESTRA -->
+  <div id="modal-probar-layout" class="fixed inset-0 bg-black/70 z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-3xl shadow-2xl max-h-[90dvh] flex flex-col">
+      <h3 class="font-bold text-base mb-0.5">Vista Previa del Layout (Datos de Muestra)</h3>
+      <p id="probar-layout-sistema" class="text-xs text-gray-500 mb-3"></p>
+      <div class="flex-1 overflow-auto border rounded mb-4">
+        <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+          <thead class="bg-gray-100"><tr id="probar-layout-header"></tr></thead>
+          <tbody id="probar-layout-body"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modal-probar-layout').classList.add('hidden')" class="px-3 py-2 bg-gray-200 rounded font-bold text-xs">Cerrar</button>
+        <button onclick="descargarMuestraLayout()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold text-xs">Descargar CSV de Muestra</button>
       </div>
     </div>
   </div>
@@ -463,15 +680,27 @@
     <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl max-h-[92dvh] overflow-y-auto">
       <h3 id="modal-cia-titulo" class="font-bold text-lg mb-3 text-purple-700">Configurar Empresa Cliente</h3>
       <input type="hidden" id="edit-cia-id">
-      <label class="text-xs font-bold text-gray-600">Razón Social o Nombre Comercial</label>
+      <label class="text-xs font-bold text-gray-600">Razón Social o Nombre Comercial *</label>
       <input type="text" id="new-cia-nombre" placeholder="Ej. Constructora del Norte S.A." class="w-full border p-2 mb-2 rounded text-sm mt-0.5">
-      <div class="grid grid-cols-3 gap-2 mb-2 text-sm">
+      <div class="grid grid-cols-3 gap-2 mb-2 text-xs">
         <div><label class="text-[10px] font-bold text-gray-500">Latitud Matriz</label><input type="text" id="new-cia-lat" placeholder="Latitud" class="w-full border p-2 rounded"></div>
         <div><label class="text-[10px] font-bold text-gray-500">Longitud Matriz</label><input type="text" id="new-cia-lng" placeholder="Longitud" class="w-full border p-2 rounded"></div>
         <div><label class="text-[10px] font-bold text-gray-500">Radio (m)</label><input type="number" id="new-cia-radio" value="100" class="w-full border p-2 rounded"></div>
       </div>
-      <label class="text-xs font-bold text-gray-600">PIN de Acceso para RH</label>
-      <input type="number" id="new-cia-pin" placeholder="PIN Administrativo" class="w-full border p-2 mb-3 rounded text-sm font-bold mt-0.5">
+      <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+        <div>
+          <label class="font-bold text-gray-600">PIN de Acceso RH *</label>
+          <input type="number" id="new-cia-pin" placeholder="PIN (Opcional al editar)" class="w-full border p-2 rounded font-bold mt-0.5">
+        </div>
+        <div>
+          <label class="font-bold text-gray-600">Perfil de Hardware</label>
+          <select id="new-cia-hardware" class="w-full border p-2 rounded bg-white mt-0.5">
+            <option value="ALTA">ALTA (IA Rápida 400ms)</option>
+            <option value="MEDIA">MEDIA (IA Moderada 800ms)</option>
+            <option value="BASICA">BÁSICA (Solo QR / PIN)</option>
+          </select>
+        </div>
+      </div>
       
       <p class="text-xs font-bold text-gray-600 uppercase mb-2">Módulos Contratados:</p>
       <div class="space-y-2 bg-gray-50 p-3 rounded-lg border mb-4 text-xs">
