@@ -10,22 +10,27 @@ if ("serviceWorker" in navigator) {
 }
 
 lucide.createIcons();
+let currentUser = null;
 let currentEmpresa = null;
 let currentReportData = [];
 let currentEmpleadosData = [];
 let currentEmpresasList = [];
+let currentUsuariosList = [];
 let currentLat = null, currentLng = null, base64Photo = null;
 let videoStream = null;
 let isSavingEmpleado = false;
 let selectedIncidenciaTarget = null;
+let pendingConsent = null;
+let currentConsentText = "";
 
-// Variables Biometría IA y Escáner QR en el mismo Visor Circular
+// Biometría IA y Escáner QR en el mismo Visor Circular
 let faceModelsLoaded = false;
 let kioskEmpresa = JSON.parse(localStorage.getItem('kiosco_empresa') || 'null');
 let empleadosPinMap = JSON.parse(localStorage.getItem('kiosco_pin_map') || '{}');
 let labeledFaceDescriptors = [];
 let faceMatcher = null;
 let faceDetectionInterval = null;
+let faceIntervalMs = 400;
 let qrScanInterval = null;
 let isQrModeActive = false;
 let enrolDescriptor = null;
@@ -33,10 +38,16 @@ let enrolInterval = null;
 let currentEnrolId = null;
 let enrolModo = "CAMARA";
 
+// Layouts de Nómina
+let currentLayoutsData = {};
+let currentLayoutSistema = null;
+let currentExportSistema = null;
+let currentMuestraLayoutData = null;
+
 // Reloj en vivo para el Kiosco
 setInterval(() => {
   const clk = document.getElementById('live-clock');
-  if(clk) clk.innerText = new Date().toLocaleTimeString('es-MX', { hour12: false });
+  if (clk) clk.innerText = new Date().toLocaleTimeString('es-MX', { hour12: false });
 }, 1000);
 
 // Síntesis de Voz (Audio Feedback)
@@ -53,6 +64,13 @@ function hablarKiosco(texto) {
 function tieneModulo(empresaObj, mod) {
   if (!empresaObj || !empresaObj.modulos) return true;
   return String(empresaObj.modulos).toUpperCase().split(',').map(s => s.trim()).includes(mod);
+}
+
+function puede(accion) {
+  if (!currentUser) return false;
+  if (currentUser.rol === 'SUPER_ADMIN') return true;
+  if (!currentUser.permisos || !currentUser.permisos.length) return true;
+  return currentUser.permisos.includes('*') || currentUser.permisos.includes(accion);
 }
 
 function imprimirElemento(elementId) {
@@ -81,6 +99,15 @@ function mostrarSaludoKiosco(nombreCompleto) {
     ring.classList.remove('border-amber-400', 'border-emerald-400/70');
     ring.classList.add('border-emerald-400');
   }
+}
+
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ==========================================
@@ -123,12 +150,12 @@ function showView(viewId) {
   const target = document.getElementById(viewId);
   if (target) {
     target.classList.remove('hidden');
-    if(viewId === 'view-dashboard' || viewId === 'view-superadmin') {
+    if (viewId === 'view-dashboard' || viewId === 'view-superadmin') {
       target.classList.add('flex');
     }
   }
   
-  if(viewId === 'view-kiosk') { 
+  if (viewId === 'view-kiosk') { 
     initGPS(); 
     updateOfflineUI(); 
     aplicarModulosKiosco(); 
@@ -143,36 +170,48 @@ function aplicarModulosKiosco() {
   const badge = document.getElementById('kiosk-sucursal-badge');
   const btnQr = document.getElementById('btn-kiosk-qr');
   const btnsComida = document.getElementById('kiosk-comida-btns');
-  if (kioskEmpresa) {
-    const esCampo = tieneModulo(kioskEmpresa, 'CAMPO');
-    badge.innerText = esCampo 
-      ? `📍 Modo Obra / Campo: ${kioskEmpresa.nombre}` 
-      : `📍 Sucursal Activa: ${kioskEmpresa.nombre}`;
-    if (btnQr) btnQr.style.display = tieneModulo(kioskEmpresa, 'QR') ? 'flex' : 'none';
-    if (btnsComida) btnsComida.style.display = tieneModulo(kioskEmpresa, 'LFT_PRENOMINA') ? 'grid' : 'none';
-  } else {
+  const btnBio = document.getElementById('kiosk-ai-status');
+  
+  if (!kioskEmpresa) {
     badge.innerText = `Kiosco sin vincular (Inicia sesión en RH una vez)`;
+    return;
+  }
+  
+  const esCampo = tieneModulo(kioskEmpresa, 'CAMPO');
+  badge.innerText = esCampo 
+    ? `📍 Modo Obra / Campo: ${kioskEmpresa.nombre}` 
+    : `📍 Sucursal Activa: ${kioskEmpresa.nombre}`;
+    
+  if (btnQr) btnQr.style.display = tieneModulo(kioskEmpresa, 'QR') ? 'flex' : 'none';
+  if (btnsComida) btnsComida.style.display = tieneModulo(kioskEmpresa, 'LFT_PRENOMINA') ? 'grid' : 'none';
+  
+  const cap = (kioskEmpresa.capacidadHardware || 'ALTA').toUpperCase();
+  faceIntervalMs = cap === 'BASICA' ? 1200 : (cap === 'MEDIA' ? 800 : 400);
+  if (cap === 'BASICA' && btnBio) {
+    btnBio.innerText = "Modo ahorro de hardware: Usa Gafete QR o PIN";
+    btnBio.className = "text-xs text-amber-400 font-semibold mb-3";
   }
 }
 
-function toggleLoader(s, t='Procesando...') { 
+function toggleLoader(s, t = 'Procesando...') { 
   const l = document.getElementById('loader'); 
   document.getElementById('loader-text').innerText = t; 
-  if(s) { l.classList.remove('hidden'); l.classList.add('flex'); } 
+  if (s) { l.classList.remove('hidden'); l.classList.add('flex'); } 
   else { l.classList.add('hidden'); l.classList.remove('flex'); } 
 }
 
-function showToast(m, t='success') { 
+function showToast(m, t = 'success') { 
   const c = document.getElementById('toast-container');
   const d = document.createElement('div'); 
-  d.className = `toast ${t==='success'?'bg-green-600':'bg-red-600'} text-white px-4 py-3 rounded-lg font-bold flex items-center gap-2 mb-2 z-50 shadow-lg text-xs md:text-sm`; 
-  d.innerHTML = `<i data-lucide="${t==='success'?'check-circle':'alert-circle'}"></i> ${m}`; 
-  c.appendChild(d); lucide.createIcons(); 
+  d.className = `toast ${t === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white px-4 py-3 rounded-lg font-bold flex items-center gap-2 mb-2 z-50 shadow-lg text-xs md:text-sm`; 
+  d.innerHTML = `<i data-lucide="${t === 'success' ? 'check-circle' : 'alert-circle'}"></i> ${m}`; 
+  c.appendChild(d); 
+  lucide.createIcons(); 
   setTimeout(() => { d.style.opacity = '0'; setTimeout(() => d.remove(), 300); }, 3500); 
 }
 
 // ==========================================
-// CÁMARA CIRCULAR KIOSCO (IA FACIAL + LECTOR QR EN EL MISMO VISOR)
+// CÁMARA CIRCULAR KIOSCO (IA FACIAL + LECTOR QR UNIFICADO)
 // ==========================================
 async function startCamera() {
   const video = document.getElementById('live-video');
@@ -183,9 +222,10 @@ async function startCamera() {
     video.onloadedmetadata = () => { video.play(); };
     
     video.onplay = () => {
+      if (faceDetectionInterval) clearInterval(faceDetectionInterval);
       faceDetectionInterval = setInterval(async () => {
-        // Si está activo el Modo QR en el círculo, pausamos la IA facial para no competir por CPU
-        if(isQrModeActive || !faceModelsLoaded || video.videoWidth === 0 || !tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) return;
+        if (isQrModeActive || !faceModelsLoaded || video.videoWidth === 0 || !tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) return;
+        if (kioskEmpresa && (kioskEmpresa.capacidadHardware || 'ALTA').toUpperCase() === 'BASICA') return;
         
         const displaySize = { width: video.videoWidth, height: video.videoHeight };
         faceapi.matchDimensions(canvas, displaySize);
@@ -195,13 +235,13 @@ async function startCamera() {
         
         canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
         
-        if(faceMatcher && resizedDetections.length > 0) {
+        if (faceMatcher && resizedDetections.length > 0) {
            const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
            results.forEach((result) => {
-              if(result.label !== 'unknown') {
+              if (result.label !== 'unknown') {
                  const [pinDetectado, nombreDetectado] = result.label.split('|');
                  const pinInput = document.getElementById('pin-input');
-                 if(pinInput.value !== pinDetectado) {
+                 if (pinInput.value !== pinDetectado) {
                      pinInput.value = pinDetectado;
                      mostrarSaludoKiosco(nombreDetectado);
                      hablarKiosco(`Hola ${nombreDetectado.split(' ')[0]}`);
@@ -209,26 +249,26 @@ async function startCamera() {
               }
            });
         }
-      }, 400);
+      }, faceIntervalMs);
     };
   } catch (err) { showToast("Permiso de cámara requerido", "error"); }
 }
 
 function stopCamera() {
   detenerEscaneoQR();
-  if(faceDetectionInterval) clearInterval(faceDetectionInterval);
+  if (faceDetectionInterval) clearInterval(faceDetectionInterval);
   if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
 }
 
 async function initKioskAI() {
   const statusEl = document.getElementById('kiosk-ai-status');
-  if(!kioskEmpresa) return;
-  if(!tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
-    if(statusEl) statusEl.innerText = "Toca Gafete QR o Usar PIN para registrar";
+  if (!kioskEmpresa) return;
+  if (!tieneModulo(kioskEmpresa, 'BIOMETRIA_IA') || (kioskEmpresa.capacidadHardware || 'ALTA').toUpperCase() === 'BASICA') {
+    if (statusEl) statusEl.innerText = "Toca Gafete QR o Usar PIN para registrar";
     return;
   }
-  if(!navigator.onLine) {
-    if(statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu Gafete QR o PIN)"; statusEl.className = "text-xs text-amber-400 font-semibold mb-3"; }
+  if (!navigator.onLine) {
+    if (statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu Gafete QR o PIN)"; statusEl.className = "text-xs text-amber-400 font-semibold mb-3"; }
     return;
   }
 
@@ -236,28 +276,26 @@ async function initKioskAI() {
      const res = await runServer('apiGetEmpleados', kioskEmpresa.empresaId);
      labeledFaceDescriptors = [];
      empleadosPinMap = {};
-     for(let e of res.data) {
-        if(e.estatus === 'ACTIVO') {
+     for (let e of (res.data || [])) {
+        if (e.estatus === 'ACTIVO') {
            empleadosPinMap[String(e.pin).trim()] = e.nombre;
-           if(e.mapaFacial) {
+           if (e.mapaFacial) {
               const arr = new Float32Array(JSON.parse(e.mapaFacial));
               labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(`${e.pin}|${e.nombre}`, [arr])); 
            }
         }
      }
-     // Guardamos el mapa de PIN -> Nombre localmente para que el lector QR salude por nombre incluso Offline
      localStorage.setItem('kiosco_pin_map', JSON.stringify(empleadosPinMap));
 
-     if(labeledFaceDescriptors.length > 0) {
+     if (labeledFaceDescriptors.length > 0) {
         faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55);
-        if(statusEl) { statusEl.innerText = `Acerca tu rostro dentro del círculo (${labeledFaceDescriptors.length} activos)`; statusEl.className = 'text-xs text-emerald-400 font-semibold mb-3'; }
+        if (statusEl) { statusEl.innerText = `Acerca tu rostro dentro del círculo (${labeledFaceDescriptors.length} activos)`; statusEl.className = 'text-xs text-emerald-400 font-semibold mb-3'; }
      } else {
-        if(statusEl) { statusEl.innerText = "IA Lista (Enrola rostros en el panel RH)"; }
+        if (statusEl) { statusEl.innerText = "IA Lista (Enrola rostros en el panel RH)"; }
      }
-  } catch(e) {}
+  } catch (e) {}
 }
 
-// Transición sin conflicto: Convierte el mismo círculo de video en un lector QR de alta velocidad
 function toggleQR() {
   const ring = document.getElementById('biometric-ring');
   const statusEl = document.getElementById('kiosk-ai-status');
@@ -274,7 +312,6 @@ function toggleQR() {
   }
 
   isQrModeActive = true;
-  // Quitamos el efecto espejo temporalmente para facilitar al usuario alinear el QR
   if (video) video.classList.remove('scale-x-[-1]');
   if (ring) {
     ring.classList.remove('border-emerald-400/70', 'border-emerald-400');
@@ -345,53 +382,115 @@ function detenerEscaneoQR() {
 }
 
 // ==========================================
-// SESIÓN DE ADMINISTRADORES Y PESTAÑAS
+// SESIÓN DE ADMINISTRADORES, SUPERVISORES Y PERMISOS
 // ==========================================
 async function loginAdmin() {
   const pin = document.getElementById('admin-pin').value;
-  if(!pin) return showToast('Ingresa PIN', 'error');
+  if (!pin) return showToast('Ingresa PIN', 'error');
   
   toggleLoader(true, 'Autenticando...');
   try {
     const res = await runServer('apiAdminLogin', pin);
-    if(res.status === 'success') {
+    if (res.status === 'success') {
       document.getElementById('admin-pin').value = '';
-      if(res.role === 'SUPER_ADMIN') {
-        loadEmpresas(); showView('view-superadmin');
+      if (res.role === 'SUPER_ADMIN') {
+        currentUser = {
+          id: (res.usuario && res.usuario.id) || 'MASTER',
+          nombre: (res.usuario && res.usuario.nombre) || 'SUPER ADMIN',
+          rol: 'SUPER_ADMIN',
+          permisos: ['*']
+        };
+        loadEmpresas(); 
+        showView('view-superadmin');
       } else {
         currentEmpresa = res.data; 
         localStorage.setItem('kiosco_empresa', JSON.stringify(currentEmpresa)); 
         kioskEmpresa = currentEmpresa; 
+        currentUser = {
+          id: (res.usuario && res.usuario.id) || 'ADMIN',
+          nombre: (res.usuario && res.usuario.nombre) || 'RH',
+          rol: res.role || 'ADMIN',
+          permisos: res.permisos || ['*']
+        };
         
-        document.getElementById('empresa-name').innerText = `RH: ${currentEmpresa.nombre}`;
+        document.getElementById('empresa-name').innerText = `RH: ${currentEmpresa.nombre} (${currentUser.rol})`;
         document.getElementById('empresa-modulos-badges').innerText = `Módulos LFT 2027: ${currentEmpresa.modulos || 'COMPLETO'}`;
         const hoy = new Date().toISOString().split('T')[0]; 
         document.getElementById('date-start').value = hoy; 
         document.getElementById('date-end').value = hoy;
+        
+        aplicarPermisosUI();
         showView('view-dashboard');
-        loadEmpleados();
-        loadTurnosYSucursales();
+        switchRHTab('prenomina');
+        if (puede('gestionar_empleados')) loadEmpleados();
+        if (puede('gestionar_turnos') || puede('config_legal')) loadTurnosYSucursales();
       }
     } else showToast(res.message, 'error');
-  } catch(e) { showToast('Servidor inaccesible', 'error'); } 
+  } catch (e) { showToast('Servidor inaccesible', 'error'); } 
   toggleLoader(false);
 }
 
-function logoutAdmin() { currentEmpresa = null; currentReportData = []; showView('view-menu'); }
+function aplicarPermisosUI() {
+  const btnNuevoEmp = document.getElementById('btn-nuevo-emp');
+  if (btnNuevoEmp) btnNuevoEmp.style.display = puede('gestionar_empleados') ? 'inline-flex' : 'none';
+  
+  const tabEmp = document.getElementById('tab-btn-empleados');
+  if (tabEmp) tabEmp.style.display = puede('gestionar_empleados') ? 'inline-block' : 'none';
+
+  const tabUsuarios = document.getElementById('tab-btn-usuarios');
+  if (tabUsuarios) tabUsuarios.style.display = puede('gestionar_supervisores') ? 'inline-block' : 'none';
+  
+  const tabLayouts = document.getElementById('tab-btn-layouts');
+  if (tabLayouts) tabLayouts.style.display = (puede('gestionar_turnos') || puede('config_legal') || puede('exportar_nomina')) ? 'inline-block' : 'none';
+  
+  const tabConfig = document.getElementById('tab-btn-config');
+  if (tabConfig) tabConfig.style.display = (puede('gestionar_turnos') || puede('config_legal') || puede('gestionar_sucursales')) ? 'inline-block' : 'none';
+  
+  const btnNomina = document.getElementById('btn-export-nomina');
+  if (btnNomina) btnNomina.style.display = puede('exportar_nomina') ? 'inline-flex' : 'none';
+  
+  const btnAspel = document.getElementById('btn-export-aspel');
+  if (btnAspel) btnAspel.style.display = puede('exportar_nomina') ? 'inline-flex' : 'none';
+  
+  const btnAudit = document.getElementById('btn-ver-audit');
+  if (btnAudit) btnAudit.style.display = puede('ver_audit_log') ? 'inline-flex' : 'none';
+  
+  window._puedeJustificar = puede('justificar_incidencias');
+}
+
+function logoutAdmin() { 
+  currentEmpresa = null; 
+  currentReportData = []; 
+  currentUser = null;
+  currentUsuariosList = [];
+  currentLayoutsData = {};
+  currentMuestraLayoutData = null;
+  showView('view-menu'); 
+}
 
 function switchRHTab(tabId) {
-  ['prenomina', 'empleados', 'config'].forEach(t => {
-    document.getElementById('tab-' + t).classList.add('hidden');
-    document.getElementById('tab-btn-' + t).classList.replace('border-blue-400', 'border-transparent');
-    document.getElementById('tab-btn-' + t).classList.replace('text-white', 'text-gray-400');
+  ['prenomina', 'empleados', 'usuarios', 'layouts', 'config'].forEach(t => {
+    const panel = document.getElementById('tab-' + t);
+    const btn = document.getElementById('tab-btn-' + t);
+    if (panel) panel.classList.add('hidden');
+    if (btn) {
+      btn.classList.replace('border-blue-400', 'border-transparent');
+      btn.classList.replace('text-white', 'text-gray-400');
+    }
   });
   
-  document.getElementById('tab-' + tabId).classList.remove('hidden');
-  document.getElementById('tab-btn-' + tabId).classList.replace('border-transparent', 'border-blue-400');
-  document.getElementById('tab-btn-' + tabId).classList.replace('text-gray-400', 'text-white');
+  const targetPanel = document.getElementById('tab-' + tabId);
+  const targetBtn = document.getElementById('tab-btn-' + tabId);
+  if (targetPanel) targetPanel.classList.remove('hidden');
+  if (targetBtn) {
+    targetBtn.classList.replace('border-transparent', 'border-blue-400');
+    targetBtn.classList.replace('text-gray-400', 'text-white');
+  }
   
-  if(tabId === 'empleados') loadEmpleados();
-  if(tabId === 'config') loadTurnosYSucursales();
+  if (tabId === 'empleados' && puede('gestionar_empleados')) loadEmpleados();
+  if (tabId === 'usuarios' && puede('gestionar_supervisores')) loadUsuarios();
+  if (tabId === 'layouts') loadLayouts();
+  if (tabId === 'config') loadTurnosYSucursales();
 }
 
 // ==========================================
@@ -421,10 +520,10 @@ function renderReportTable(data) {
   
   actualizarKPIs(data);
 
-  if(data.length === 0) {
+  if (data.length === 0) {
     tb.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-500">Sin registros en este filtro.</td></tr>'; 
   } else {
-    btn.classList.remove('hidden');
+    if (puede('exportar_nomina')) btn.classList.remove('hidden');
     tb.innerHTML = data.map(row => {
       let recuadroFoto = '';
       if (row.foto && row.foto !== 'SIN_FOTO') {
@@ -456,14 +555,14 @@ function renderReportTable(data) {
         ? `<a href="https://www.google.com/maps?q=${row.lat},${row.lng}" target="_blank" class="text-[10px] text-blue-600 hover:underline font-bold ml-1" title="Ver ubicación exacta en Google Maps">📍 Mapa (${row.distancia || 0}m)</a>`
         : '';
 
-      const btnJustificar = (row.entrada === '--') 
-        ? `<button onclick="abrirModalIncidencia('${row.empId}', '${row.empleado}', '${row.fecha}')" class="text-[11px] bg-gray-100 hover:bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded border ml-1">Justificar</button>` 
+      const btnJustificar = (row.entrada === '--' && window._puedeJustificar !== false) 
+        ? `<button onclick="abrirModalIncidencia('${row.empId}', '${escapeHtml(row.empleado)}', '${row.fecha}')" class="text-[11px] bg-gray-100 hover:bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded border ml-1">Justificar</button>` 
         : '';
 
       return `
       <tr class="border-b hover:bg-gray-50">
-        <td class="p-2.5 font-bold">${row.empleado} <br><span class="text-[10px] text-gray-500 font-normal">PIN: ${row.pin || row.empId} ${row.rfc ? '| RFC: '+row.rfc : ''}</span></td>
-        <td class="p-2.5"><span class="bg-gray-100 border px-2 py-0.5 rounded text-[11px] font-semibold">${row.sucursal || 'Matriz'}</span></td>
+        <td class="p-2.5 font-bold">${escapeHtml(row.empleado)} <br><span class="text-[10px] text-gray-500 font-normal">PIN: ${row.pin || row.empId} ${row.rfc ? '| RFC: '+row.rfc : ''}</span></td>
+        <td class="p-2.5"><span class="bg-gray-100 border px-2 py-0.5 rounded text-[11px] font-semibold">${escapeHtml(row.sucursal || 'Matriz')}</span></td>
         <td class="p-2.5">${row.fecha}</td>
         <td class="p-2.5 text-center">${recuadroFoto}</td>
         <td class="p-2.5 text-center">${badgeHorario}</td>
@@ -477,13 +576,14 @@ function renderReportTable(data) {
 }
 
 function abrirModalIncidencia(empId, nombre, fecha) {
+  if (!puede('justificar_incidencias')) return showToast('Sin permiso para justificar', 'error');
   selectedIncidenciaTarget = { empId, fecha };
   document.getElementById('inc-emp-info').innerText = `${nombre} — Fecha: ${fecha}`;
   document.getElementById('modal-incidencia').classList.remove('hidden');
 }
 
 async function guardarIncidencia() {
-  if(!selectedIncidenciaTarget) return;
+  if (!selectedIncidenciaTarget) return;
   const motivo = document.getElementById('inc-motivo').value;
   toggleLoader(true, 'Sellando bitácora STPS...');
   try {
@@ -491,14 +591,15 @@ async function guardarIncidencia() {
       empresaId: currentEmpresa.empresaId,
       empId: selectedIncidenciaTarget.empId,
       fecha: selectedIncidenciaTarget.fecha,
-      motivo: motivo
+      motivo: motivo,
+      usuarioId: currentUser ? currentUser.id : 'RH'
     });
-    if(res.status === 'success') {
+    if (res.status === 'success') {
       showToast(res.message);
       document.getElementById('modal-incidencia').classList.add('hidden');
       loadReports();
     } else showToast(res.message, 'error');
-  } catch(e) { showToast('Error al justificar', 'error'); }
+  } catch (e) { showToast('Error al justificar', 'error'); }
   toggleLoader(false);
 }
 
@@ -517,16 +618,16 @@ function filterReport() {
 }
 
 async function loadReports() {
-  if(!currentEmpresa) return;
+  if (!currentEmpresa) return;
   const s = document.getElementById('date-start').value, e = document.getElementById('date-end').value;
-  if(!s || !e) return; 
+  if (!s || !e) return; 
   toggleLoader(true, 'Calculando Pre-Nómina LFT 2027...');
   try {
     const res = await runServer('apiGetReports', { empresaId: currentEmpresa.empresaId, fechaInicio: s, fechaFin: e });
     currentReportData = res.data || [];
     actualizarSelectoresSucursales(currentReportData);
     filterReport();
-  } catch(er) { showToast('Error al generar reporte', 'error'); } 
+  } catch (er) { showToast('Error al generar reporte', 'error'); } 
   toggleLoader(false);
 }
 
@@ -568,6 +669,30 @@ function exportToCSV() {
   document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
+async function exportarLayoutNomina(formato) {
+  if (!puede('exportar_nomina')) return showToast('Sin permiso para exportar', 'error');
+  const s = document.getElementById('date-start').value, e = document.getElementById('date-end').value;
+  if (!s || !e) return showToast('Selecciona fechas', 'error');
+  toggleLoader(true, `Generando layout ${formato}...`);
+  try {
+    const res = await runServer('apiExportNominaLayout', {
+      empresaId: currentEmpresa.empresaId,
+      fechaInicio: s,
+      fechaFin: e,
+      formato: formato
+    });
+    if (res.status === 'success') {
+      const blob = new Blob([res.contenido], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = res.archivo;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      showToast(`Layout ${formato} descargado`);
+    } else showToast(res.message, 'error');
+  } catch (e) { showToast('Error al generar layout', 'error'); }
+  toggleLoader(false);
+}
+
 // ==========================================
 // COLABORADORES: EDICIÓN, RFC/CURP, ACUERDO LFT 2027 Y GAFETES
 // ==========================================
@@ -577,28 +702,27 @@ function actualizarSelectoresSucursales(listaItems) {
   const selEmp = document.getElementById('filter-sucursal-emp');
   const dataList = document.getElementById('lista-sucursales');
   
-  if(selReport) selReport.innerHTML = '<option value="TODAS">Todas</option>' + sucursales.map(s => `<option value="${s}">${s}</option>`).join('');
-  if(selEmp) selEmp.innerHTML = '<option value="TODAS">Todas</option>' + sucursales.map(s => `<option value="${s}">${s}</option>`).join('');
-  if(dataList) dataList.innerHTML = sucursales.map(s => `<option value="${s}"></option>`).join('');
+  if (selReport) selReport.innerHTML = '<option value="TODAS">Todas</option>' + sucursales.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if (selEmp) selEmp.innerHTML = '<option value="TODAS">Todas</option>' + sucursales.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if (dataList) dataList.innerHTML = sucursales.map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
 }
 
 async function loadEmpleados() {
-  if(!currentEmpresa) return;
+  if (!currentEmpresa) return;
   toggleLoader(true, 'Cargando catálogo...');
   try {
     const res = await runServer('apiGetEmpleados', currentEmpresa.empresaId);
     currentEmpleadosData = res.data || [];
     
-    // Actualizar mapa local de PIN -> Nombre para el Kiosco
     empleadosPinMap = {};
     currentEmpleadosData.forEach(e => {
-      if(e.estatus === 'ACTIVO') empleadosPinMap[String(e.pin).trim()] = e.nombre;
+      if (e.estatus === 'ACTIVO') empleadosPinMap[String(e.pin).trim()] = e.nombre;
     });
     localStorage.setItem('kiosco_pin_map', JSON.stringify(empleadosPinMap));
 
     actualizarSelectoresSucursales(currentEmpleadosData);
     filterEmpleadosTable();
-  } catch(e) {} 
+  } catch (e) {} 
   toggleLoader(false);
 }
 
@@ -614,26 +738,26 @@ function filterEmpleadosTable() {
   
   document.getElementById('table-empleados').innerHTML = filtered.length ? filtered.map(e => `
     <tr class="border-b hover:bg-gray-50">
-      <td class="p-2.5 font-bold">${e.nombre} <br><span class="${e.estatus==='ACTIVO'?'text-green-600':'text-red-500'} text-[10px] font-extrabold">${e.estatus}</span></td>
+      <td class="p-2.5 font-bold">${escapeHtml(e.nombre)} <br><span class="${e.estatus === 'ACTIVO' ? 'text-green-600' : 'text-red-500'} text-[10px] font-extrabold">${e.estatus}</span></td>
       <td class="p-2.5 font-mono text-[11px] text-gray-600">
-        <div>RFC: <strong>${e.rfc || 'Sin capturar'}</strong></div>
-        <div>CURP: <strong>${e.curp || 'Sin capturar'}</strong></div>
+        <div>RFC: <strong>${escapeHtml(e.rfc || 'Sin capturar')}</strong></div>
+        <div>CURP: <strong>${escapeHtml(e.curp || 'Sin capturar')}</strong></div>
       </td>
       <td class="p-2.5">
-        <span class="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">${e.sucursal || 'Matriz'}</span>
-        <span class="ml-1 font-bold text-gray-600">(${e.turno})</span>
+        <span class="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">${escapeHtml(e.sucursal || 'Matriz')}</span>
+        <span class="ml-1 font-bold text-gray-600">(${escapeHtml(e.turno)})</span>
       </td>
       <td class="p-2.5">
-        <span class="text-blue-600 font-bold mr-1">${e.pin}</span>
+        <span class="text-blue-600 font-bold mr-1">${escapeHtml(e.pin)}</span>
         <button onclick="verGafeteQR('${e.id}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded border text-[11px] font-bold"><i data-lucide="qr-code" class="w-3 h-3 inline"></i> QR</button>
       </td>
-      <td class="p-2.5 text-center">${e.mapaFacial ? `<button onclick="openEnrolarModal('${e.id}', '${e.nombre}')" class="text-green-600 font-bold text-xs hover:underline"><i data-lucide="check-circle" class="w-3.5 h-3.5 inline"></i> Activo</button>` : `<button onclick="openEnrolarModal('${e.id}', '${e.nombre}')" class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">Enrolar</button>`}</td>
+      <td class="p-2.5 text-center">${e.mapaFacial ? `<button onclick="openEnrolarModal('${e.id}', '${escapeHtml(e.nombre)}')" class="text-green-600 font-bold text-xs hover:underline"><i data-lucide="check-circle" class="w-3.5 h-3.5 inline"></i> Activo</button>` : `<button onclick="openEnrolarModal('${e.id}', '${escapeHtml(e.nombre)}')" class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">Enrolar</button>`}</td>
       <td class="p-2.5 text-center">
         <button onclick="verCartaAcuerdoLFT('${e.id}')" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 mx-auto"><i data-lucide="file-check" class="w-3 h-3"></i> Carta STPS</button>
       </td>
       <td class="p-2.5 text-right space-x-1">
         <button onclick="abrirModalEditarEmpleado('${e.id}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-bold text-xs">Editar</button>
-        <button onclick="toggleEstatus('${e.id}', '${e.estatus==='ACTIVO'?'INACTIVO':'ACTIVO'}')" class="bg-gray-200 hover:bg-gray-300 px-2 py-0.5 rounded font-bold text-xs">${e.estatus==='ACTIVO'?'Baja':'Alta'}</button>
+        <button onclick="toggleEstatus('${e.id}', '${e.estatus === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'}')" class="bg-gray-200 hover:bg-gray-300 px-2 py-0.5 rounded font-bold text-xs">${e.estatus === 'ACTIVO' ? 'Baja' : 'Alta'}</button>
       </td>
     </tr>
   `).join('') : '<tr><td colspan="7" class="p-6 text-center text-gray-500">Sin colaboradores registrados.</td></tr>';
@@ -641,6 +765,7 @@ function filterEmpleadosTable() {
 }
 
 function abrirModalNuevoEmpleado() {
+  if (!puede('gestionar_empleados')) return showToast('Sin permiso', 'error');
   document.getElementById('modal-emp-titulo').innerText = 'Alta de Nuevo Colaborador';
   document.getElementById('edit-emp-id').value = '';
   document.getElementById('new-emp-nombre').value = '';
@@ -652,8 +777,9 @@ function abrirModalNuevoEmpleado() {
 }
 
 function abrirModalEditarEmpleado(empId) {
+  if (!puede('gestionar_empleados')) return showToast('Sin permiso', 'error');
   const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
-  if(!emp) return;
+  if (!emp) return;
   document.getElementById('modal-emp-titulo').innerText = 'Editar Expediente del Colaborador';
   document.getElementById('edit-emp-id').value = emp.id;
   document.getElementById('new-emp-nombre').value = emp.nombre || '';
@@ -666,6 +792,7 @@ function abrirModalEditarEmpleado(empId) {
 }
 
 async function saveEmpleado() {
+  if (!puede('gestionar_empleados')) return showToast('Sin permiso', 'error');
   if (isSavingEmpleado) return;
   const editId = document.getElementById('edit-emp-id').value;
   const payload = { 
@@ -676,9 +803,10 @@ async function saveEmpleado() {
     curp: document.getElementById('new-emp-curp').value.trim().toUpperCase(),
     sucursal: document.getElementById('new-emp-sucursal').value.trim() || 'Matriz',
     pin: document.getElementById('new-emp-pin').value.trim(), 
-    turnoId: document.getElementById('new-emp-turno').value || 'T1'
+    turnoId: document.getElementById('new-emp-turno').value || 'T1',
+    usuarioId: currentUser ? currentUser.id : 'RH'
   };
-  if(!payload.nombre || !payload.pin) return showToast('Nombre y PIN son obligatorios', 'error');
+  if (!payload.nombre || !payload.pin) return showToast('Nombre y PIN son obligatorios', 'error');
   
   isSavingEmpleado = true;
   const action = editId ? 'apiUpdateEmpleado' : 'apiAddEmpleado';
@@ -691,13 +819,13 @@ async function saveEmpleado() {
       e => String(e.pin).trim() === payload.pin && e.nombre.toLowerCase() === payload.nombre.toLowerCase()
     );
 
-    if(res.status === 'success' || yaExisteEnTabla) { 
+    if (res.status === 'success' || yaExisteEnTabla) { 
       showToast('Colaborador guardado correctamente', 'success'); 
       document.getElementById('modal-empleado').classList.add('hidden'); 
     } else {
       showToast(res.message, 'error');
     }
-  } catch(e) { 
+  } catch (e) { 
     await loadEmpleados();
     document.getElementById('modal-empleado').classList.add('hidden');
     showToast('Sincronizado con la base de datos', 'success');
@@ -709,7 +837,7 @@ async function saveEmpleado() {
 
 function verGafeteQR(empId) {
   const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
-  if(!emp) return;
+  if (!emp) return;
   document.getElementById('gafete-empresa').innerText = currentEmpresa.nombre;
   document.getElementById('gafete-nombre').innerText = emp.nombre;
   document.getElementById('gafete-sucursal').innerText = `Sucursal: ${emp.sucursal || 'Matriz'}`;
@@ -722,7 +850,7 @@ function verGafeteQR(empId) {
 
 function verCartaAcuerdoLFT(empId) {
   const emp = currentEmpleadosData.find(x => String(x.id) === String(empId));
-  if(!emp) return;
+  if (!emp) return;
   document.getElementById('acuerdo-fecha').innerText = new Date().toLocaleDateString('es-MX');
   document.getElementById('acuerdo-empresa').innerText = currentEmpresa.nombre;
   document.getElementById('acuerdo-nombre').innerText = emp.nombre;
@@ -738,58 +866,178 @@ function verCartaAcuerdoLFT(empId) {
 }
 
 async function toggleEstatus(id, newStatus) { 
+  if (!puede('gestionar_empleados')) return showToast('Sin permiso', 'error');
   toggleLoader(true); 
-  await runServer('apiToggleEmpleado', { empresaId: currentEmpresa.empresaId, empleadoId: id, newStatus }); 
+  await runServer('apiToggleEmpleado', { empresaId: currentEmpresa.empresaId, empleadoId: id, newStatus, usuarioId: currentUser ? currentUser.id : 'RH' }); 
   toggleLoader(false); 
   loadEmpleados(); 
 }
 
 // ==========================================
-// TURNOS Y GEOCERCAS MULTI-SUCURSAL
+// SUPERVISORES DE OBRA Y PERMISOS GRANULARES
+// ==========================================
+async function loadUsuarios() {
+  if (!currentEmpresa || !puede('gestionar_supervisores')) return;
+  toggleLoader(true, 'Cargando supervisores...');
+  try {
+    const res = await runServer('apiGetUsuarios', { empresaId: currentEmpresa.empresaId });
+    currentUsuariosList = res.data || [];
+    document.getElementById('table-usuarios').innerHTML = currentUsuariosList.length ? currentUsuariosList.map(u => `
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-3 font-bold">${escapeHtml(u.nombre)}<br><span class="text-[10px] font-extrabold ${u.estatus === 'ACTIVO' ? 'text-green-600' : 'text-red-500'}">${u.estatus}</span></td>
+        <td class="p-3"><span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[11px] font-bold">${u.rol}</span></td>
+        <td class="p-3 text-[11px] text-gray-600">${(u.permisos || []).join(', ')}</td>
+        <td class="p-3 text-right space-x-1">
+          <button onclick="abrirModalEditarPermisos('${u.id}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded font-bold text-xs">Permisos</button>
+          <button onclick="toggleUsuarioStatus('${u.id}', '${u.estatus === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'}')" class="bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded font-bold text-xs">${u.estatus === 'ACTIVO' ? 'Suspender' : 'Activar'}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="4" class="p-6 text-center text-gray-500">Sin supervisores registrados.</td></tr>';
+    lucide.createIcons();
+  } catch (e) {}
+  toggleLoader(false);
+}
+
+function abrirModalNuevoUsuario() {
+  if (!puede('gestionar_supervisores')) return showToast('Sin permiso', 'error');
+  document.getElementById('modal-usr-titulo').innerText = 'Alta de Supervisor de Obra / Sucursal';
+  document.getElementById('new-usr-nombre').value = '';
+  document.getElementById('new-usr-pin').value = '';
+  document.getElementById('new-usr-pin').disabled = false;
+  document.getElementById('usr-edit-id').value = '';
+  document.getElementById('usr-rol').value = 'SUPERVISOR';
+  document.querySelectorAll('.chk-perm-usr').forEach(cb => {
+    cb.checked = (cb.value === 'ver_reportes' || cb.value === 'justificar_incidencias');
+  });
+  document.getElementById('modal-usuario').classList.remove('hidden');
+}
+
+function abrirModalEditarPermisos(usrId) {
+  const u = currentUsuariosList.find(x => String(x.id) === String(usrId));
+  if (!u) return;
+  document.getElementById('modal-usr-titulo').innerText = `Editar Permisos: ${u.nombre}`;
+  document.getElementById('new-usr-nombre').value = u.nombre;
+  document.getElementById('new-usr-pin').value = '';
+  document.getElementById('new-usr-pin').disabled = true;
+  document.getElementById('usr-rol').value = u.rol;
+  document.getElementById('usr-edit-id').value = u.id;
+  document.querySelectorAll('.chk-perm-usr').forEach(cb => {
+    cb.checked = (u.permisos || []).includes(cb.value);
+  });
+  document.getElementById('modal-usuario').classList.remove('hidden');
+}
+
+async function saveUsuario() {
+  if (!puede('gestionar_supervisores')) return showToast('Sin permiso', 'error');
+  const editId = document.getElementById('usr-edit-id').value;
+  const permisos = Array.from(document.querySelectorAll('.chk-perm-usr:checked')).map(cb => cb.value);
+  
+  if (editId) {
+    toggleLoader(true, 'Actualizando permisos...');
+    const res = await runServer('apiUpdateUsuarioPermisos', {
+      empresaId: currentEmpresa.empresaId,
+      usuarioId: editId,
+      permisos,
+      actualizadoPor: currentUser ? currentUser.id : 'RH'
+    });
+    toggleLoader(false);
+    if (res.status === 'success') {
+      showToast(res.message);
+      document.getElementById('modal-usuario').classList.add('hidden');
+      loadUsuarios();
+    } else showToast(res.message, 'error');
+    return;
+  }
+
+  const payload = {
+    empresaId: currentEmpresa.empresaId,
+    nombre: document.getElementById('new-usr-nombre').value.trim(),
+    pin: document.getElementById('new-usr-pin').value.trim(),
+    rol: document.getElementById('usr-rol').value,
+    permisos: permisos,
+    creadoPor: currentUser ? currentUser.id : 'RH'
+  };
+  if (!payload.nombre || !payload.pin) return showToast('Nombre y PIN obligatorios', 'error');
+  toggleLoader(true, 'Creando supervisor...');
+  const res = await runServer('apiAddUsuario', payload);
+  toggleLoader(false);
+  if (res.status === 'success') {
+    showToast(res.message);
+    document.getElementById('modal-usuario').classList.add('hidden');
+    loadUsuarios();
+  } else showToast(res.message, 'error');
+}
+
+async function toggleUsuarioStatus(usrId, newStatus) {
+  if (!puede('gestionar_supervisores')) return showToast('Sin permiso', 'error');
+  toggleLoader(true);
+  await runServer('apiToggleUsuarioStatus', {
+    empresaId: currentEmpresa.empresaId,
+    usuarioId: usrId,
+    newStatus,
+    actualizadoPor: currentUser ? currentUser.id : 'RH'
+  });
+  toggleLoader(false);
+  loadUsuarios();
+}
+
+// ==========================================
+// TURNOS, GEOCERCAS MULTI-SUCURSAL Y CONFIG LEGAL 2026-2030
 // ==========================================
 async function loadTurnosYSucursales() {
-  if(!currentEmpresa) return;
+  if (!currentEmpresa) return;
   try {
-    const [resT, resS] = await Promise.all([
+    const [resT, resS, resLegal] = await Promise.all([
       runServer('apiGetTurnos', currentEmpresa.empresaId),
-      runServer('apiGetSucursales', currentEmpresa.empresaId)
+      runServer('apiGetSucursales', currentEmpresa.empresaId),
+      runServer('apiGetConfigLegal', { empresaId: currentEmpresa.empresaId })
     ]);
     
     const turnos = resT.data || [];
     document.getElementById('table-turnos').innerHTML = turnos.map(t => `
-      <tr class="border-b"><td class="p-2 font-bold text-blue-600">${t.id}</td><td class="p-2">${t.nombre}</td><td class="p-2 font-mono">${t.entrada} - ${t.salida}</td><td class="p-2">${t.tolerancia}m</td></tr>
+      <tr class="border-b"><td class="p-2 font-bold text-blue-600">${escapeHtml(t.id)}</td><td class="p-2">${escapeHtml(t.nombre)}</td><td class="p-2 font-mono">${t.entrada} - ${t.salida}</td><td class="p-2">${t.tolerancia}m</td></tr>
     `).join('') || '<tr><td colspan="4" class="p-2 text-center text-gray-400">Sin turnos</td></tr>';
 
     const selTurno = document.getElementById('new-emp-turno');
-    if(selTurno && turnos.length) {
-      selTurno.innerHTML = turnos.map(t => `<option value="${t.id}">${t.id} - ${t.nombre} (${t.entrada}-${t.salida})</option>`).join('');
+    if (selTurno && turnos.length) {
+      selTurno.innerHTML = turnos.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.id)} - ${escapeHtml(t.nombre)} (${t.entrada}-${t.salida})</option>`).join('');
     }
 
     const sucs = resS.data || [];
     document.getElementById('table-sucursales').innerHTML = sucs.map(s => `
-      <tr class="border-b"><td class="p-2 font-bold text-green-700">${s.nombre}</td><td class="p-2 font-mono text-[10px]">${s.lat}, ${s.lng}</td><td class="p-2">${s.radio}m</td></tr>
+      <tr class="border-b"><td class="p-2 font-bold text-green-700">${escapeHtml(s.nombre)}</td><td class="p-2 font-mono text-[10px]">${s.lat}, ${s.lng}</td><td class="p-2">${s.radio}m</td></tr>
     `).join('') || '<tr><td colspan="3" class="p-2 text-center text-gray-400">Usa la Geocerca Matriz por defecto</td></tr>';
-  } catch(e) {}
+
+    const legal = resLegal.data || [];
+    const tbLegal = document.getElementById('table-config-legal');
+    if (tbLegal) {
+      tbLegal.innerHTML = legal.map(l => `
+        <tr class="border-b"><td class="p-2 font-bold text-purple-700">${l.anio}</td><td class="p-2 font-bold">${l.horasMax} h/sem</td><td class="p-2">${l.doblesMaxDia} h/día</td><td class="p-2">${l.tripleDesde} h/sem</td><td class="p-2 text-gray-500">${escapeHtml(l.notas || '')}</td></tr>
+      `).join('') || '<tr><td colspan="5" class="p-2 text-center text-gray-400">Sin configuración legal</td></tr>';
+    }
+  } catch (e) {}
 }
 
 async function guardarTurno() {
+  if (!puede('gestionar_turnos')) return showToast('Sin permiso', 'error');
   const payload = {
     empresaId: currentEmpresa.empresaId,
     id: document.getElementById('cfg-turno-id').value.trim(),
     nombre: document.getElementById('cfg-turno-nombre').value.trim(),
     entrada: document.getElementById('cfg-turno-ent').value,
     salida: document.getElementById('cfg-turno-sal').value,
-    tolerancia: document.getElementById('cfg-turno-tol').value
+    tolerancia: document.getElementById('cfg-turno-tol').value,
+    usuarioId: currentUser ? currentUser.id : 'RH'
   };
-  if(!payload.id || !payload.nombre) return showToast('Completa código y nombre del turno', 'error');
+  if (!payload.id || !payload.nombre) return showToast('Completa código y nombre del turno', 'error');
   toggleLoader(true, 'Guardando turno...');
   const res = await runServer('apiAddTurno', payload);
   toggleLoader(false);
-  if(res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
+  if (res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
 }
 
 function capturarGpsActualSucursal() {
-  if(!navigator.geolocation) return showToast('GPS no soportado', 'error');
+  if (!navigator.geolocation) return showToast('GPS no soportado', 'error');
   navigator.geolocation.getCurrentPosition(pos => {
     document.getElementById('cfg-suc-lat').value = pos.coords.latitude.toFixed(6);
     document.getElementById('cfg-suc-lng').value = pos.coords.longitude.toFixed(6);
@@ -798,24 +1046,45 @@ function capturarGpsActualSucursal() {
 }
 
 async function guardarSucursal() {
+  if (!puede('gestionar_sucursales')) return showToast('Sin permiso', 'error');
   const payload = {
     empresaId: currentEmpresa.empresaId,
     nombre: document.getElementById('cfg-suc-nombre').value.trim(),
     lat: document.getElementById('cfg-suc-lat').value.trim(),
     lng: document.getElementById('cfg-suc-lng').value.trim(),
-    radio: document.getElementById('cfg-suc-radio').value.trim() || 150
+    radio: document.getElementById('cfg-suc-radio').value.trim() || 150,
+    usuarioId: currentUser ? currentUser.id : 'RH'
   };
-  if(!payload.nombre || !payload.lat || !payload.lng) return showToast('Completa nombre y coordenadas', 'error');
-  toggleLoader(true, 'Guardando sucursal...');
+  if (!payload.nombre || !payload.lat || !payload.lng) return showToast('Completa nombre y coordenadas', 'error');
+  toggleLoader(true, 'Guardando geocerca...');
   const res = await runServer('apiAddSucursal', payload);
   toggleLoader(false);
-  if(res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
+  if (res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
+}
+
+async function guardarConfigLegal() {
+  if (!puede('config_legal')) return showToast('Sin permiso', 'error');
+  const payload = {
+    empresaId: currentEmpresa.empresaId,
+    anio: parseInt(document.getElementById('cfg-legal-anio').value),
+    horasMax: parseFloat(document.getElementById('cfg-legal-horas').value),
+    doblesMaxDia: parseFloat(document.getElementById('cfg-legal-dobles').value),
+    tripleDesde: parseFloat(document.getElementById('cfg-legal-triple').value),
+    notas: document.getElementById('cfg-legal-notas').value.trim(),
+    usuarioId: currentUser ? currentUser.id : 'RH'
+  };
+  if (!payload.anio || !payload.horasMax) return showToast('Año y horas son obligatorios', 'error');
+  toggleLoader(true, 'Guardando parámetro legal...');
+  const res = await runServer('apiSaveConfigLegal', payload);
+  toggleLoader(false);
+  if (res.status === 'success') { showToast(res.message); loadTurnosYSucursales(); } else showToast(res.message, 'error');
 }
 
 // ==========================================
 // ENROLAMIENTO BIOMÉTRICO (CÁMARA Y ARCHIVO)
 // ==========================================
 async function openEnrolarModal(empId, nombre) {
+  if (!puede('enrolar_rostros')) return showToast('Sin permiso para enrolar', 'error');
   currentEnrolId = empId; enrolModo = "CAMARA"; enrolDescriptor = null;
   document.getElementById('enrolar-nombre').innerText = nombre;
   document.getElementById('modal-enrolar').classList.remove('hidden');
@@ -832,13 +1101,14 @@ async function openEnrolarModal(empId, nombre) {
     video.onloadedmetadata = () => { video.play(); };
     video.onplay = () => {
       const canvas = document.getElementById('enrolar-canvas');
+      if (enrolInterval) clearInterval(enrolInterval);
       enrolInterval = setInterval(async () => {
-        if(enrolModo !== "CAMARA" || !faceModelsLoaded || video.videoWidth === 0) return;
+        if (enrolModo !== "CAMARA" || !faceModelsLoaded || video.videoWidth === 0) return;
         const displaySize = { width: video.videoWidth, height: video.videoHeight };
         faceapi.matchDimensions(canvas, displaySize);
         const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
         canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-        if(detection) {
+        if (detection) {
            faceapi.draw.drawDetections(canvas, faceapi.resizeResults(detection, displaySize));
            document.getElementById('enrolar-status').innerText = "Rostro Detectado. ¡Listo!";
            document.getElementById('enrolar-status').className = 'text-xs font-bold text-green-500 mb-3';
@@ -848,15 +1118,15 @@ async function openEnrolarModal(empId, nombre) {
         }
       }, 300);
     };
-  } catch(e) { document.getElementById('enrolar-status').innerText = "Cámara inaccesible. Sube una foto."; }
+  } catch (e) { document.getElementById('enrolar-status').innerText = "Cámara inaccesible. Sube una foto."; }
 }
 
 async function procesarFotoArchivo(event) {
   const file = event.target.files[0];
-  if(!file) return;
+  if (!file) return;
   enrolModo = "ARCHIVO"; clearInterval(enrolInterval);
   const video = document.getElementById('enrolar-video');
-  if(video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+  if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
   video.classList.add('hidden');
   
   const preview = document.getElementById('enrolar-img-preview');
@@ -877,7 +1147,7 @@ async function procesarFotoArchivo(event) {
         document.getElementById('enrolar-status').innerText = "No se detectó rostro claro. Prueba otra foto.";
         document.getElementById('enrolar-status').className = "text-xs font-bold text-red-500 mb-3";
      }
-  } catch(err) { showToast("Error al leer imagen", "error"); }
+  } catch (err) { showToast("Error al leer imagen", "error"); }
   toggleLoader(false);
 }
 
@@ -885,23 +1155,313 @@ function closeEnrolarModal() {
    document.getElementById('modal-enrolar').classList.add('hidden');
    clearInterval(enrolInterval);
    const video = document.getElementById('enrolar-video');
-   if(video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+   if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
 }
 
 async function capturarYGuardarRostro() {
-   if(!enrolDescriptor) return;
+   if (!enrolDescriptor) return;
    toggleLoader(true, 'Guardando Mapa Biométrico...');
    const payload = { 
      empresaId: currentEmpresa.empresaId, 
      empleadoId: currentEnrolId, 
-     descriptorJson: JSON.stringify(Array.from(enrolDescriptor)) 
+     descriptorJson: JSON.stringify(Array.from(enrolDescriptor)),
+     usuarioId: currentUser ? currentUser.id : 'RH'
    };
    try {
       const res = await runServer('apiEnrolarRostro', payload);
-      if(res.status === 'success') { showToast(res.message); closeEnrolarModal(); loadEmpleados(); } 
+      if (res.status === 'success') { showToast(res.message); closeEnrolarModal(); loadEmpleados(); } 
       else showToast(res.message, 'error');
-   } catch(e) { showToast('Fallo al guardar', 'error'); }
+   } catch (e) { showToast('Fallo al guardar', 'error'); }
    toggleLoader(false);
+}
+
+// ==========================================
+// BITÁCORA DE AUDITORÍA INMUTABLE SHA-256
+// ==========================================
+async function abrirAuditLog() {
+  if (!puede('ver_audit_log') && (!currentUser || currentUser.rol !== 'SUPER_ADMIN')) {
+    return showToast('Sin permiso para ver auditoría', 'error');
+  }
+  toggleLoader(true, 'Cargando bitácora SHA-256...');
+  try {
+    const empresaId = currentEmpresa ? currentEmpresa.empresaId : null;
+    const res = await runServer('apiGetAuditLog', { empresaId, limite: 200 });
+    const data = res.data || [];
+    document.getElementById('table-audit').innerHTML = data.map(a => `
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-2 font-mono text-[11px] text-gray-600">${String(a.timestamp || '').substring(0, 19).replace('T', ' ')}</td>
+        <td class="p-2 font-bold text-blue-700">${escapeHtml(a.accion)}</td>
+        <td class="p-2 font-semibold">${escapeHtml(a.usuarioId || 'SISTEMA')}</td>
+        <td class="p-2 text-[11px] text-gray-600 max-w-xs truncate" title="${escapeHtml(a.detalles)}">${escapeHtml(a.detalles)}</td>
+        <td class="p-2 font-mono text-[10px] text-emerald-700">${String(a.hashActual || '').substring(0, 14)}...</td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">Sin registros en la bitácora.</td></tr>';
+    document.getElementById('modal-audit').classList.remove('hidden');
+  } catch (e) { showToast('Error al cargar bitácora', 'error'); }
+  toggleLoader(false);
+}
+
+async function verificarIntegridadAudit() {
+  const empresaId = currentEmpresa ? currentEmpresa.empresaId : null;
+  toggleLoader(true, 'Verificando cadena criptográfica SHA-256...');
+  try {
+    const res = await runServer('apiVerificarAudit', { empresaId });
+    if (res.integridad) {
+      showToast(`✅ Cadena íntegra sin alteraciones (${res.total} bloques verificados)`, 'success');
+    } else {
+      showToast(`❌ ${res.mensaje}`, 'error');
+    }
+  } catch (e) { showToast('Error al verificar cadena', 'error'); }
+  toggleLoader(false);
+}
+
+// ==========================================
+// CONSTRUCTOR VISUAL DE LAYOUTS DE NÓMINA
+// ==========================================
+const CAMPOS_ORIGEN_DISPONIBLES = [
+  { value: "", label: "— Usar valor fijo —" },
+  { value: "pin", label: "PIN del empleado" },
+  { value: "fecha", label: "Fecha (YYYY-MM-DD)" },
+  { value: "dia", label: "Día del mes (1-31)" },
+  { value: "incidencia", label: "Incidencia (nombre)" },
+  { value: "incidencia_codigo", label: "Incidencia (código CONTPAQi/Aspel)" },
+  { value: "retardo", label: "Retardo (1 / 0)" },
+  { value: "falta", label: "Falta (1 / 0)" },
+  { value: "dobles", label: "Horas extra dobles" },
+  { value: "triples", label: "Horas extra triples" },
+  { value: "mins_comida", label: "Minutos de comida" },
+  { value: "entrada", label: "Hora entrada" },
+  { value: "salida", label: "Hora salida" },
+  { value: "sucursal", label: "Sucursal / Obra" },
+  { value: "rfc", label: "RFC" },
+  { value: "curp", label: "CURP" },
+  { value: "nombre", label: "Nombre completo" },
+  { value: "uno", label: "Valor constante 1" }
+];
+
+async function loadLayouts() {
+  if (!currentEmpresa) return;
+  toggleLoader(true, 'Cargando layouts de nómina...');
+  try {
+    const res = await runServer('apiListarLayouts', { empresaId: currentEmpresa.empresaId });
+    currentLayoutsData = res.data || {};
+    renderLayoutsGrid();
+  } catch (e) { showToast('Error al cargar layouts', 'error'); }
+  toggleLoader(false);
+}
+
+function renderLayoutsGrid() {
+  const grid = document.getElementById('grid-layouts');
+  const sistemas = Object.keys(currentLayoutsData);
+  if (!sistemas.length) {
+    grid.innerHTML = '<div class="col-span-2 bg-white p-6 rounded-xl border text-center text-gray-500 text-xs">No hay layouts configurados. Presiona "+ Nuevo Layout Personalizado".</div>';
+    return;
+  }
+  grid.innerHTML = sistemas.map(sistema => {
+    const mapeo = currentLayoutsData[sistema] || [];
+    const preview = mapeo.slice(0, 5).map(m => `<span class="bg-gray-100 border px-2 py-0.5 rounded text-[10px] font-mono mr-1 mb-1 inline-block">${escapeHtml(m.destino)} ← ${escapeHtml(m.origen || m.fijo)}</span>`).join('');
+    const mas = mapeo.length > 5 ? `<span class="text-[10px] text-gray-400 font-bold">+${mapeo.length - 5} más</span>` : '';
+    return `
+      <div class="bg-white p-4 rounded-xl shadow border flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="font-extrabold text-sm text-blue-800">${escapeHtml(sistema)}</h4>
+            <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">${mapeo.length} columnas</span>
+          </div>
+          <div class="mb-3">${preview || '<span class="text-gray-400 text-xs">Sin columnas</span>'} ${mas}</div>
+        </div>
+        <div class="flex flex-wrap gap-1.5 pt-2 border-t text-xs">
+          <button onclick="abrirModalLayout('${escapeHtml(sistema)}')" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-2.5 py-1 rounded font-bold">Editar</button>
+          <button onclick="abrirProbarLayout('${escapeHtml(sistema)}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded font-bold">Probar Muestra</button>
+          <button onclick="abrirExportLayout('${escapeHtml(sistema)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-bold">Exportar</button>
+          <button onclick="eliminarLayoutCompleto('${escapeHtml(sistema)}')" class="ml-auto text-red-600 hover:underline px-2 py-1 font-bold">Eliminar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  setTimeout(() => lucide.createIcons(), 50);
+}
+
+function abrirModalLayoutNuevo() {
+  currentLayoutSistema = null;
+  document.getElementById('layout-modal-titulo').innerText = 'Nuevo Layout de Nómina';
+  document.getElementById('layout-sistema').value = '';
+  document.getElementById('layout-sistema').disabled = false;
+  document.getElementById('layout-descripcion').value = '';
+  document.getElementById('table-mapeo-body').innerHTML = '';
+  agregarFilaMapeo({ destino: 'Código Empleado', origen: 'pin', fijo: '', orden: 1 });
+  agregarFilaMapeo({ destino: 'Fecha', origen: 'fecha', fijo: '', orden: 2 });
+  agregarFilaMapeo({ destino: 'Incidencia', origen: 'incidencia_codigo', fijo: '', orden: 3 });
+  document.getElementById('modal-layout').classList.remove('hidden');
+}
+
+function abrirModalLayout(sistema) {
+  currentLayoutSistema = sistema;
+  document.getElementById('layout-modal-titulo').innerText = `Editar Layout: ${sistema}`;
+  document.getElementById('layout-sistema').value = sistema;
+  document.getElementById('layout-sistema').disabled = true;
+  document.getElementById('layout-descripcion').value = '';
+  const body = document.getElementById('table-mapeo-body');
+  body.innerHTML = '';
+  const mapeo = currentLayoutsData[sistema] || [];
+  mapeo.forEach(m => agregarFilaMapeo(m));
+  if (!mapeo.length) agregarFilaMapeo({});
+  document.getElementById('modal-layout').classList.remove('hidden');
+}
+
+function agregarFilaMapeo(data = {}) {
+  const body = document.getElementById('table-mapeo-body');
+  const num = body.children.length + 1;
+  const options = CAMPOS_ORIGEN_DISPONIBLES.map(o => 
+    `<option value="${o.value}" ${data.origen === o.value ? 'selected' : ''}>${o.label}</option>`
+  ).join('');
+  const tr = document.createElement('tr');
+  tr.className = 'border-b';
+  tr.innerHTML = `
+    <td class="p-2 font-bold text-gray-500">${num}</td>
+    <td class="p-2"><input type="text" class="mapeo-destino w-full border p-1.5 rounded text-xs font-semibold" value="${escapeHtml(data.destino || '')}" placeholder="Ej. ClaveTrabajador"></td>
+    <td class="p-2"><select class="mapeo-origen w-full border p-1.5 rounded text-xs bg-white">${options}</select></td>
+    <td class="p-2"><input type="text" class="mapeo-fijo w-full border p-1.5 rounded text-xs" value="${escapeHtml(data.fijo || '')}" placeholder="Opcional"></td>
+    <td class="p-2 text-center"><button onclick="this.closest('tr').remove(); reenumerarMapeo();" class="text-red-500 font-bold hover:underline">✕</button></td>
+  `;
+  body.appendChild(tr);
+}
+
+function reenumerarMapeo() {
+  const rows = document.querySelectorAll('#table-mapeo-body tr');
+  rows.forEach((r, i) => { r.cells[0].innerText = i + 1; });
+}
+
+function verificarLayoutActual() {
+  const rows = document.querySelectorAll('#table-mapeo-body tr');
+  if (!rows.length) return showToast('Agrega al menos una columna', 'error');
+  let errores = [];
+  rows.forEach((r, idx) => {
+    const destino = r.querySelector('.mapeo-destino').value.trim();
+    const origen = r.querySelector('.mapeo-origen').value;
+    const fijo = r.querySelector('.mapeo-fijo').value.trim();
+    if (!destino) errores.push(`Fila ${idx + 1}: falta nombre de columna.`);
+    if (!origen && !fijo) errores.push(`Fila ${idx + 1}: elige origen o valor fijo.`);
+  });
+  if (errores.length) showToast(`❌ ${errores[0]}`, 'error');
+  else showToast(`✅ Layout válido (${rows.length} columnas)`, 'success');
+}
+
+async function guardarLayoutActual() {
+  const sistema = document.getElementById('layout-sistema').value.trim().toUpperCase();
+  if (!sistema) return showToast('El nombre del sistema es obligatorio', 'error');
+  const rows = document.querySelectorAll('#table-mapeo-body tr');
+  const mapeo = [];
+  let error = null;
+  rows.forEach((r, idx) => {
+    const destino = r.querySelector('.mapeo-destino').value.trim();
+    const origen = r.querySelector('.mapeo-origen').value;
+    const fijo = r.querySelector('.mapeo-fijo').value.trim();
+    if (!destino) return;
+    if (!origen && !fijo) { error = `Fila ${idx + 1}: define un origen o valor fijo.`; return; }
+    mapeo.push({ destino, origen, fijo, orden: mapeo.length + 1 });
+  });
+  if (error) return showToast(error, 'error');
+  if (!mapeo.length) return showToast('Agrega al menos una columna', 'error');
+  
+  toggleLoader(true, 'Guardando layout...');
+  try {
+    const res = await runServer('apiGuardarLayout', {
+      empresaId: currentEmpresa.empresaId,
+      sistema,
+      mapeo,
+      usuarioId: currentUser ? currentUser.id : 'RH'
+    });
+    if (res.status === 'success') {
+      showToast(res.message);
+      document.getElementById('modal-layout').classList.add('hidden');
+      loadLayouts();
+    } else showToast(res.message, 'error');
+  } catch (e) { showToast('Error al guardar layout', 'error'); }
+  toggleLoader(false);
+}
+
+async function eliminarLayoutCompleto(sistema) {
+  if (!confirm(`¿Eliminar el layout "${sistema}"?`)) return;
+  toggleLoader(true, 'Eliminando...');
+  try {
+    const res = await runServer('apiEliminarLayout', {
+      empresaId: currentEmpresa.empresaId,
+      sistema,
+      usuarioId: currentUser ? currentUser.id : 'RH'
+    });
+    if (res.status === 'success') { showToast(res.message); loadLayouts(); }
+    else showToast(res.message, 'error');
+  } catch (e) { showToast('Error al eliminar', 'error'); }
+  toggleLoader(false);
+}
+
+function abrirExportLayout(sistema) {
+  currentExportSistema = sistema;
+  document.getElementById('export-layout-sistema').innerText = `Sistema: ${sistema}`;
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('export-layout-inicio').value = hoy;
+  document.getElementById('export-layout-fin').value = hoy;
+  document.getElementById('modal-export-layout').classList.remove('hidden');
+}
+
+async function ejecutarExportLayout() {
+  if (!currentExportSistema) return;
+  const fi = document.getElementById('export-layout-inicio').value;
+  const ff = document.getElementById('export-layout-fin').value;
+  if (!fi || !ff) return showToast('Selecciona ambas fechas', 'error');
+  toggleLoader(true, `Exportando ${currentExportSistema}...`);
+  try {
+    const res = await runServer('apiExportLayoutPersonalizado', {
+      empresaId: currentEmpresa.empresaId,
+      fechaInicio: fi,
+      fechaFin: ff,
+      sistema: currentExportSistema,
+      usuarioId: currentUser ? currentUser.id : 'RH'
+    });
+    if (res.status === 'success') {
+      const blob = new Blob([res.contenido], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = res.archivo;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      showToast(`Layout ${currentExportSistema} descargado`);
+      document.getElementById('modal-export-layout').classList.add('hidden');
+    } else showToast(res.message, 'error');
+  } catch (e) { showToast('Error al exportar', 'error'); }
+  toggleLoader(false);
+}
+
+async function abrirProbarLayout(sistema) {
+  toggleLoader(true, `Generando muestra de ${sistema}...`);
+  try {
+    const res = await runServer('apiProbarLayout', { empresaId: currentEmpresa.empresaId, sistema });
+    if (res.status !== 'success') {
+      toggleLoader(false);
+      return showToast(res.message, 'error');
+    }
+    currentMuestraLayoutData = { sistema, contenido: res.contenido, archivo: res.archivo };
+    const lineas = String(res.contenido).replace(/^\uFEFF/, '').split('\n');
+    const headers = lineas[0].split(',');
+    const filas = lineas.slice(1).filter(l => l.trim() !== '').map(l => l.split(','));
+    
+    document.getElementById('probar-layout-sistema').innerText = `Sistema: ${sistema} · ${filas.length} filas de prueba`;
+    document.getElementById('probar-layout-header').innerHTML = headers.map(h => `<th class="p-2 border-b font-bold">${escapeHtml(h)}</th>`).join('');
+    document.getElementById('probar-layout-body').innerHTML = filas.map(fila => 
+      `<tr class="border-b">${fila.map(cel => `<td class="p-2 font-mono">${escapeHtml(cel)}</td>`).join('')}</tr>`
+    ).join('');
+    document.getElementById('modal-probar-layout').classList.remove('hidden');
+  } catch (e) { showToast('Error al probar layout', 'error'); }
+  toggleLoader(false);
+}
+
+function descargarMuestraLayout() {
+  if (!currentMuestraLayoutData) return;
+  const blob = new Blob([currentMuestraLayoutData.contenido], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = currentMuestraLayoutData.archivo;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
 // ==========================================
@@ -910,37 +1470,38 @@ async function capturarYGuardarRostro() {
 async function loadEmpresas() {
   toggleLoader(true, 'Cargando clientes y Shards...');
   try {
-    const res = await runServer('apiGetEmpresas');
+    const res = await runServer('apiGetEmpresas', {});
     currentEmpresasList = res.data || [];
     document.getElementById('table-empresas').innerHTML = currentEmpresasList.map(c => {
       const mods = String(c.modulos || '').split(',').filter(Boolean);
-      const badges = mods.map(m => `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[10px] font-bold mr-1">${m}</span>`).join('');
+      const badges = mods.map(m => `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[10px] font-bold mr-1">${escapeHtml(m)}</span>`).join('');
       const rangoPrecio = c.empleadosActivos <= 30 ? 'Rango 1-30' : 'Rango 31-100+';
       
       const shardBadge = (c.shardId && c.shardId.length > 15)
         ? `<a href="https://docs.google.com/spreadsheets/d/${c.shardId}" target="_blank" class="inline-block mt-1 bg-teal-100 text-teal-800 border border-teal-300 px-2 py-0.5 rounded text-[10px] font-bold hover:underline">🗄️ BD Propia Aislada ↗</a>`
-        : `<button onclick="migrarShardEmpresa('${c.id}', '${c.nombre}')" class="mt-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-400 px-2 py-0.5 rounded text-[10px] font-bold">⚡ Aislar BD (Crear Archivo Propio)</button>`;
+        : `<button onclick="migrarShardEmpresa('${c.id}', '${escapeHtml(c.nombre)}')" class="mt-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-400 px-2 py-0.5 rounded text-[10px] font-bold">⚡ Aislar BD (Crear Archivo Propio)</button>`;
+
+      const hwBadge = `<span class="inline-block mt-1 ml-1 bg-gray-100 text-gray-700 border px-1.5 py-0.5 rounded text-[10px] font-semibold">⚙️ HW: ${c.capacidadHardware || 'ALTA'}</span>`;
 
       return `
       <tr class="border-b hover:bg-gray-50">
         <td class="p-3">
-          <div class="font-bold text-purple-700">${c.id}</div>
-          <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${c.estatus==='SUSPENDIDA'?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${c.estatus || 'ACTIVA'}</span>
+          <div class="font-bold text-purple-700">${escapeHtml(c.id)}</div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${c.estatus === 'SUSPENDIDA' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">${c.estatus || 'ACTIVA'}</span>
         </td>
-        <td class="p-3 font-bold">${c.nombre}<br>${shardBadge}</td>
+        <td class="p-3 font-bold">${escapeHtml(c.nombre)}<br>${shardBadge}${hwBadge}</td>
         <td class="p-3 text-center">
           <span class="font-extrabold text-sm text-blue-600">${c.empleadosActivos}</span> activos<br>
           <span class="text-[10px] text-gray-500 font-semibold">${rangoPrecio}</span>
         </td>
-        <td class="p-3 font-mono font-bold">${c.pin}</td>
         <td class="p-3">${badges}</td>
         <td class="p-3 text-right space-x-1">
           <button onclick="abrirEditarEmpresaCompleta('${c.id}')" class="bg-gray-800 hover:bg-gray-700 text-white px-2.5 py-1 rounded text-xs font-bold">Editar / Módulos</button>
-          <button onclick="toggleStatusEmpresa('${c.id}', '${c.estatus==='SUSPENDIDA'?'ACTIVA':'SUSPENDIDA'}')" class="${c.estatus==='SUSPENDIDA'?'bg-green-600 text-white':'bg-red-100 text-red-700'} px-2.5 py-1 rounded text-xs font-bold">${c.estatus==='SUSPENDIDA'?'Reactivar':'Suspender'}</button>
+          <button onclick="toggleStatusEmpresa('${c.id}', '${c.estatus === 'SUSPENDIDA' ? 'ACTIVA' : 'SUSPENDIDA'}')" class="${c.estatus === 'SUSPENDIDA' ? 'bg-green-600 text-white' : 'bg-red-100 text-red-700'} px-2.5 py-1 rounded text-xs font-bold">${c.estatus === 'SUSPENDIDA' ? 'Reactivar' : 'Suspender'}</button>
         </td>
       </tr>`;
     }).join('');
-  } catch(e){} 
+  } catch (e) {} 
   toggleLoader(false);
 }
 
@@ -948,11 +1509,11 @@ async function migrarShardEmpresa(empresaId, nombre) {
   toggleLoader(true, `Creando Google Sheet independiente para ${nombre}...`);
   try {
     const res = await runServer('apiMigrateEmpresaShard', { empresaId });
-    if(res.status === 'success') {
+    if (res.status === 'success') {
       showToast(res.message, 'success');
       loadEmpresas();
     } else showToast(res.message, 'error');
-  } catch(e) { showToast('Error al crear BD aislada', 'error'); }
+  } catch (e) { showToast('Error al crear BD aislada', 'error'); }
   toggleLoader(false);
 }
 
@@ -964,20 +1525,22 @@ function abrirModalEmpresa() {
   document.getElementById('new-cia-lng').value = '';
   document.getElementById('new-cia-radio').value = '100';
   document.getElementById('new-cia-pin').value = '';
+  document.getElementById('new-cia-hardware').value = 'ALTA';
   document.querySelectorAll('.chk-modulo').forEach(cb => cb.checked = cb.value !== 'CAMPO');
   document.getElementById('modal-empresa').classList.remove('hidden');
 }
 
 function abrirEditarEmpresaCompleta(id) {
   const cia = currentEmpresasList.find(x => String(x.id) === String(id));
-  if(!cia) return;
+  if (!cia) return;
   document.getElementById('modal-cia-titulo').innerText = `Editar Cliente: ${cia.nombre}`;
   document.getElementById('edit-cia-id').value = cia.id;
   document.getElementById('new-cia-nombre').value = cia.nombre || '';
   document.getElementById('new-cia-lat').value = cia.lat || '';
   document.getElementById('new-cia-lng').value = cia.lng || '';
   document.getElementById('new-cia-radio').value = cia.radio || '100';
-  document.getElementById('new-cia-pin').value = cia.pin || '';
+  document.getElementById('new-cia-pin').value = '';
+  document.getElementById('new-cia-hardware').value = cia.capacidadHardware || 'ALTA';
   const activos = String(cia.modulos || '').toUpperCase().split(',').map(s => s.trim());
   document.querySelectorAll('.chk-modulo').forEach(cb => { cb.checked = activos.includes(cb.value); });
   document.getElementById('modal-empresa').classList.remove('hidden');
@@ -993,15 +1556,16 @@ async function saveEmpresa() {
     lng: document.getElementById('new-cia-lng').value.trim(), 
     radio: document.getElementById('new-cia-radio').value.trim(), 
     pin: document.getElementById('new-cia-pin').value.trim(), 
-    modulos: seleccionados || 'FOTO,GPS'
+    modulos: seleccionados || 'FOTO,GPS',
+    capacidadHardware: document.getElementById('new-cia-hardware').value
   };
-  if(!payload.nombre || !payload.pin) return showToast('Nombre y PIN obligatorios', 'error');
+  if (!payload.nombre || (!editId && !payload.pin)) return showToast('Nombre y PIN obligatorios', 'error');
   
   const action = editId ? 'apiUpdateEmpresa' : 'apiAddEmpresa';
   toggleLoader(true, editId ? 'Actualizando cliente...' : 'Creando empresa y Base de Datos...'); 
   const res = await runServer(action, payload); 
   toggleLoader(false);
-  if(res.status === 'success') { showToast(res.message); document.getElementById('modal-empresa').classList.add('hidden'); loadEmpresas(); } 
+  if (res.status === 'success') { showToast(res.message); document.getElementById('modal-empresa').classList.add('hidden'); loadEmpresas(); } 
   else showToast(res.message, 'error');
 }
 
@@ -1013,13 +1577,13 @@ async function toggleStatusEmpresa(empresaId, newStatus) {
 }
 
 // ==========================================
-// REGISTRO KIOSCO (CON 4 MOMENTOS, COMPRESIÓN RÁPIDA Y OFFLINE)
+// REGISTRO KIOSCO (CON 4 MOMENTOS, CONSENTIMIENTO Y OFFLINE)
 // ==========================================
-function initGPS() { if(navigator.geolocation) navigator.geolocation.watchPosition( p => { currentLat = p.coords.latitude; currentLng = p.coords.longitude; }, () => {}); }
+function initGPS() { if (navigator.geolocation) navigator.geolocation.watchPosition(p => { currentLat = p.coords.latitude; currentLng = p.coords.longitude; }, () => {}); }
 
 async function registrar(tipo) {
   const pin = document.getElementById('pin-input').value;
-  if(!pin) {
+  if (!pin) {
     const manualBox = document.getElementById('pin-manual-box');
     if (manualBox) manualBox.classList.remove('hidden');
     return showToast('Acerca tu rostro, escanea QR o ingresa tu PIN', 'error');
@@ -1039,7 +1603,7 @@ async function registrar(tipo) {
     canvas.height = Math.round(video.videoHeight * scale);
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     const flash = document.getElementById('flash-overlay');
-    if(flash) { flash.classList.replace('opacity-0', 'opacity-100'); setTimeout(() => flash.classList.replace('opacity-100', 'opacity-0'), 150); }
+    if (flash) { flash.classList.replace('opacity-0', 'opacity-100'); setTimeout(() => flash.classList.replace('opacity-100', 'opacity-0'), 150); }
     base64Photo = canvas.toDataURL('image/jpeg', 0.55);
   } else { base64Photo = null; }
   
@@ -1056,22 +1620,68 @@ async function registrar(tipo) {
     offlineTime: fechaActual.toLocaleTimeString('en-GB') 
   };
 
-  if(!navigator.onLine) return guardarLocalmente(payload);
+  if (!navigator.onLine) return guardarLocalmente(payload);
 
   toggleLoader(true, 'Registrando movimiento...');
   try {
     const res = await runServer('apiProcessCheckIn', payload);
-    if(res.status === 'success') { 
+    if (res.status === 'success') { 
       mostrarSaludoKiosco(res.empleadoNombre || 'COLABORADOR');
       showToast(res.message); 
       hablarKiosco(`${tipo.replace('_', ' ')} registrada. Gracias, ${res.empleadoNombre || ''}`);
       setTimeout(() => resetKiosk(), 1800);
+    } else if (res.requiresConsent) {
+      pendingConsent = { empleadoId: res.empleadoId, empleadoNombre: res.empleadoNombre, pin, payload };
+      mostrarModalConsentimiento(res.empleadoNombre);
     } else {
       showToast(res.message, 'error');
       hablarKiosco(res.message);
     }
   } catch (e) { guardarLocalmente(payload); } 
   toggleLoader(false);
+}
+
+async function mostrarModalConsentimiento(nombreEmpleado) {
+  try {
+    const res = await runServer('apiGetAvisoPrivacidad', { empresaId: kioskEmpresa.empresaId });
+    currentConsentText = res.texto || 'Aviso de privacidad institucional LFT 2027.';
+    document.getElementById('consent-texto').innerText = currentConsentText;
+    document.getElementById('consent-empleado').innerText = `Colaborador: ${nombreEmpleado || ''}`;
+    document.getElementById('modal-consent').classList.remove('hidden');
+  } catch (e) { showToast('Error al cargar aviso', 'error'); }
+}
+
+async function aceptarConsentimiento() {
+  if (!pendingConsent) return;
+  toggleLoader(true, 'Sellando acuerdo digital...');
+  try {
+    const res = await runServer('apiRegisterConsent', {
+      empresaId: kioskEmpresa.empresaId,
+      empleadoId: pendingConsent.empleadoId,
+      pin: pendingConsent.pin,
+      metodo: 'KIOSCO_DIGITAL'
+    });
+    if (res.status === 'success') {
+      document.getElementById('modal-consent').classList.add('hidden');
+      const retryPayload = pendingConsent.payload;
+      pendingConsent = null;
+      const retry = await runServer('apiProcessCheckIn', retryPayload);
+      if (retry.status === 'success') {
+        mostrarSaludoKiosco(retry.empleadoNombre);
+        showToast(retry.message);
+        hablarKiosco(`Consentimiento y asistencia registrados`);
+        setTimeout(() => resetKiosk(), 1800);
+      } else showToast(retry.message, 'error');
+    } else showToast(res.message, 'error');
+  } catch (e) { showToast('Error al aceptar', 'error'); }
+  toggleLoader(false);
+}
+
+function rechazarConsentimiento() {
+  pendingConsent = null;
+  document.getElementById('modal-consent').classList.add('hidden');
+  showToast('Es necesario aceptar el acuerdo para registrar asistencia', 'error');
+  resetKiosk();
 }
 
 function guardarLocalmente(payload) {
@@ -1088,20 +1698,20 @@ function guardarLocalmente(payload) {
 function updateOfflineUI() {
   let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
   const banner = document.getElementById('offline-banner');
-  if(offlineData.length > 0) { document.getElementById('offline-count').innerText = offlineData.length; banner.classList.remove('hidden'); banner.classList.add('flex'); } 
+  if (offlineData.length > 0) { document.getElementById('offline-count').innerText = offlineData.length; banner.classList.remove('hidden'); banner.classList.add('flex'); } 
   else { banner.classList.add('hidden'); banner.classList.remove('flex'); }
 }
 
 async function syncOffline() {
-  if(!navigator.onLine) return showToast('Sin conexión a internet', 'error');
+  if (!navigator.onLine) return showToast('Sin conexión a internet', 'error');
   let offlineData = JSON.parse(localStorage.getItem('offline_registros') || '[]');
-  if(offlineData.length === 0) return;
+  if (offlineData.length === 0) return;
   toggleLoader(true, `Sincronizando ${offlineData.length} registros...`);
   try {
     const res = await runServer('apiSyncOffline', offlineData);
-    if(res.status === 'success') { localStorage.removeItem('offline_registros'); showToast(res.message); updateOfflineUI(); } 
+    if (res.status === 'success') { localStorage.removeItem('offline_registros'); showToast(res.message); updateOfflineUI(); } 
     else showToast(res.message, 'error');
-  } catch(e) { showToast('Fallo de conexión', 'error'); } 
+  } catch (e) { showToast('Fallo de conexión', 'error'); } 
   toggleLoader(false);
 }
 
@@ -1110,11 +1720,11 @@ function resetKiosk() {
   base64Photo = null;
   detenerEscaneoQR();
   const card = document.getElementById('kiosk-greeting-card');
-  if(card) card.classList.add('hidden');
+  if (card) card.classList.add('hidden');
   const manualBox = document.getElementById('pin-manual-box');
-  if(manualBox) manualBox.classList.add('hidden');
+  if (manualBox) manualBox.classList.add('hidden');
   const statusEl = document.getElementById('kiosk-ai-status');
-  if(statusEl && tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
+  if (statusEl && tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
     statusEl.innerText = "Acerca tu rostro dentro del círculo";
     statusEl.className = "text-xs text-emerald-400 font-semibold mb-3";
   }
