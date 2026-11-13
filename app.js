@@ -96,7 +96,7 @@ function mostrarSaludoKiosco(nombreCompleto) {
     card.classList.remove('hidden');
   }
   if (ring) {
-    ring.classList.remove('border-amber-400', 'border-emerald-400/70');
+    ring.classList.remove('border-amber-400', 'border-emerald-400/80');
     ring.classList.add('border-emerald-400');
   }
 }
@@ -108,6 +108,15 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Activa o desactiva el modo Pantalla Completa nativo en Android / Tablet
+function toggleFullScreenKiosk() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
 }
 
 // ==========================================
@@ -136,7 +145,7 @@ async function runServer(actionName, payloadData) {
 }
 
 // ==========================================
-// NAVEGACIÓN Y MÓDULOS DE KIOSCO
+// NAVEGACIÓN FULLSCREEN Y MÓDULOS DE KIOSCO
 // ==========================================
 function showView(viewId) {
   ['view-menu', 'view-admin', 'view-kiosk', 'view-dashboard', 'view-superadmin'].forEach(id => {
@@ -150,7 +159,8 @@ function showView(viewId) {
   const target = document.getElementById(viewId);
   if (target) {
     target.classList.remove('hidden');
-    if (viewId === 'view-dashboard' || viewId === 'view-superadmin') {
+    // CRÍTICO: Activar flex en Kiosco, Dashboard y SuperAdmin para ocupar el 100% de la Tablet
+    if (viewId === 'view-kiosk' || viewId === 'view-dashboard' || viewId === 'view-superadmin') {
       target.classList.add('flex');
     }
   }
@@ -161,6 +171,7 @@ function showView(viewId) {
     aplicarModulosKiosco(); 
     initKioskAI(); 
     startCamera(); 
+    lucide.createIcons();
   } else { 
     stopCamera(); 
   }
@@ -189,7 +200,7 @@ function aplicarModulosKiosco() {
   faceIntervalMs = cap === 'BASICA' ? 1200 : (cap === 'MEDIA' ? 800 : 400);
   if (cap === 'BASICA' && btnBio) {
     btnBio.innerText = "Modo ahorro de hardware: Usa Gafete QR o PIN";
-    btnBio.className = "text-xs text-amber-400 font-semibold mb-3";
+    btnBio.className = "text-base md:text-lg text-amber-400 font-bold tracking-wide";
   }
 }
 
@@ -264,11 +275,11 @@ async function initKioskAI() {
   const statusEl = document.getElementById('kiosk-ai-status');
   if (!kioskEmpresa) return;
   if (!tieneModulo(kioskEmpresa, 'BIOMETRIA_IA') || (kioskEmpresa.capacidadHardware || 'ALTA').toUpperCase() === 'BASICA') {
-    if (statusEl) statusEl.innerText = "Toca Gafete QR o Usar PIN para registrar";
+    if (statusEl) statusEl.innerText = "Toca Escanear Gafete QR o Ingresar PIN";
     return;
   }
   if (!navigator.onLine) {
-    if (statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu Gafete QR o PIN)"; statusEl.className = "text-xs text-amber-400 font-semibold mb-3"; }
+    if (statusEl) { statusEl.innerText = "Modo Offline Activo (Usa tu Gafete QR o PIN)"; statusEl.className = "text-base md:text-lg text-amber-400 font-bold tracking-wide"; }
     return;
   }
 
@@ -289,7 +300,7 @@ async function initKioskAI() {
 
      if (labeledFaceDescriptors.length > 0) {
         faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55);
-        if (statusEl) { statusEl.innerText = `Acerca tu rostro dentro del círculo (${labeledFaceDescriptors.length} activos)`; statusEl.className = 'text-xs text-emerald-400 font-semibold mb-3'; }
+        if (statusEl) { statusEl.innerText = `Acerca tu rostro dentro del círculo (${labeledFaceDescriptors.length} activos)`; statusEl.className = 'text-base md:text-lg text-emerald-400 font-bold tracking-wide'; }
      } else {
         if (statusEl) { statusEl.innerText = "IA Lista (Enrola rostros en el panel RH)"; }
      }
@@ -306,7 +317,7 @@ function toggleQR() {
     detenerEscaneoQR();
     if (statusEl) {
       statusEl.innerText = "Acerca tu rostro dentro del círculo";
-      statusEl.className = "text-xs text-emerald-400 font-semibold mb-3";
+      statusEl.className = "text-base md:text-lg text-emerald-400 font-bold tracking-wide";
     }
     return;
   }
@@ -314,16 +325,16 @@ function toggleQR() {
   isQrModeActive = true;
   if (video) video.classList.remove('scale-x-[-1]');
   if (ring) {
-    ring.classList.remove('border-emerald-400/70', 'border-emerald-400');
+    ring.classList.remove('border-emerald-400/80', 'border-emerald-400');
     ring.classList.add('border-amber-400');
   }
   if (statusEl) {
     statusEl.innerText = "📷 Modo QR Activo: Acerca tu gafete al círculo";
-    statusEl.className = "text-xs text-amber-400 font-bold mb-3 animate-pulse";
+    statusEl.className = "text-base md:text-lg text-amber-400 font-bold tracking-wide animate-pulse";
   }
   if (btnQr) {
     btnQr.classList.add('bg-amber-500', 'text-slate-950');
-    btnQr.classList.remove('bg-slate-800', 'text-slate-200');
+    btnQr.classList.remove('bg-slate-800', 'text-slate-100');
   }
 
   const qrCanvas = document.createElement('canvas');
@@ -354,7 +365,7 @@ function toggleQR() {
         detenerEscaneoQR();
         if (statusEl) {
           statusEl.innerText = "Gafete verificado. Presiona Entrada o Salida.";
-          statusEl.className = "text-xs text-emerald-400 font-bold mb-3";
+          statusEl.className = "text-base md:text-lg text-emerald-400 font-bold tracking-wide";
         }
       }
     }
@@ -373,11 +384,11 @@ function detenerEscaneoQR() {
   if (video) video.classList.add('scale-x-[-1]');
   if (ring) {
     ring.classList.remove('border-amber-400');
-    ring.classList.add('border-emerald-400/70');
+    ring.classList.add('border-emerald-400/80');
   }
   if (btnQr) {
     btnQr.classList.remove('bg-amber-500', 'text-slate-950');
-    btnQr.classList.add('bg-slate-800', 'text-slate-200');
+    btnQr.classList.add('bg-slate-800', 'text-slate-100');
   }
 }
 
@@ -1726,6 +1737,6 @@ function resetKiosk() {
   const statusEl = document.getElementById('kiosk-ai-status');
   if (statusEl && tieneModulo(kioskEmpresa, 'BIOMETRIA_IA')) {
     statusEl.innerText = "Acerca tu rostro dentro del círculo";
-    statusEl.className = "text-xs text-emerald-400 font-semibold mb-3";
+    statusEl.className = "text-base md:text-lg text-emerald-400 font-bold tracking-wide";
   }
 }
